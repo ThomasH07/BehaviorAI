@@ -1,7 +1,27 @@
 # BehaviorAI
 
+Make sure to 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## Setup
+
+`npm install` 
+
+on project directory folder
+
+Make sure to create a venv in the backend folder:
+
+macOS/Linux
+
+`python3.12 -m venv venv`
+
+Windows
+
+`py -3.12 -m venv venv`
+
+and 
+
+`pip install -r requirements.txt`
 ## Available Scripts
 
 In the project directory, you can run:
