@@ -6,6 +6,18 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 In the project directory, you can run:
 
+### `npm run dev`
+This is suppose to set up the backend and the frontend all together and runs both frontend and backend
+
+later on will add another script that runs both backend and frontend tests
+
+In the backend directory, you can run:
+
+### `uvicorn main:app --reload`
+Runs the fastAPI server
+
+In the frontend directory, you can run:
+
 ### `npm start`
 
 Runs the app in the development mode.\

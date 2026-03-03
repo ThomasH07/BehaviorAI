@@ -1,4 +1,3 @@
-// src/api/media.ts
 export async function uploadRecordingBlob(file: Blob) {
   const formData = new FormData();
   formData.append("file", file, "recording.webm");

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+
 import { uploadRecordingBlob } from "../api/media";
 
 type Status = "idle" | "ready" | "recording" | "stopped" |"error"; //status of the media process
@@ -139,7 +140,7 @@ export default function MediaSetup() { //function to use the media setup process
     };
 
     //teardown media stream and recorder
-    const teardownMedia = () => {
+    const teardownMedia = useCallback(() => {
         recorderRef.current = null; //clear the recorder ref
         const stream = streamRef.current;
         if (stream) {
@@ -164,14 +165,14 @@ export default function MediaSetup() { //function to use the media setup process
             URL.revokeObjectURL(recordedURL); //revoke any existing recorded URL to free up memory
             setRecordedURL(null); //clear the recorded URL state
         }
-    };
+    },[recordedURL]);
 
     //cleanup on component unmount
     useEffect(() => {
         return () => {
             teardownMedia(); //ensure media resources are cleaned up when the component is unmounted to prevent memory leaks and free up camera/microphone resources
         };
-    }, []); //empty dependency array ensures this effect runs only once on mount and cleanup on unmount
+    }, [teardownMedia]); //empty dependency array ensures this effect runs only once on mount and cleanup on unmount
     
 
     //upload to backend func
