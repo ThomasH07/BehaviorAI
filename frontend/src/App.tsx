@@ -1,6 +1,6 @@
 import React from 'react';
 import './App.css';
-
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import MediaSetup from "./components/MediaSetup";
 
 
@@ -29,5 +29,11 @@ import MediaSetup from "./components/MediaSetup";
 
 
 export default function App() {
-  return <MediaSetup />;
+  return(
+  <Router>
+      <Routes>
+        <Route path="/" element={<MediaSetup />} />
+      </Routes>
+    </Router>
+    );
 }

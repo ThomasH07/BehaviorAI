@@ -5,9 +5,25 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 ## Setup
 
-`npm install` 
+aws cli set up: 
+
+windows
+
+https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+
+mac
+
+`brew install awscli`
+
+this is the aws cli that allows you to run aws cmds
+
+`aws configure set region us-east-2`
+
+`aws login`
 
 on project directory folder
+
+`npm install` 
 
 Make sure to create a venv in the backend folder:
 

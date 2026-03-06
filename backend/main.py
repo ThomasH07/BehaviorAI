@@ -1,19 +1,20 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import shutil
 import os
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 app = FastAPI()
+static_dir = os.path.join(os.getcwd(), "static")
 
-#CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+inner_static = os.path.join(static_dir, "static")
 
-@app.post("/")
-def test_post():
-    return {"message": "POST request was a success!"}
+if os.path.exists(inner_static):
+    app.mount("/static", StaticFiles(directory=inner_static), name="static")
+
+@app.get("/{full_path:path}")
+async def serve_react(full_path: str):
+    file_path = os.path.join(static_dir, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    
+    return FileResponse(os.path.join(static_dir, "index.html"))
