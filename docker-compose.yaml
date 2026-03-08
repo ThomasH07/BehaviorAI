@@ -4,7 +4,7 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile 
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     volumes:
@@ -19,10 +19,12 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile 
+      dockerfile: Dockerfile.dev
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
     environment:
       - DATABASE_URL=db
+#docker-compose up --build
+#docker-compose down

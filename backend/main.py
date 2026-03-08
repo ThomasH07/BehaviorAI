@@ -2,10 +2,19 @@ import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-static_dir = os.path.join(os.getcwd(), "static")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8000","http://localhost:3000"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+static_dir = os.path.join(os.getcwd(), "static")
 inner_static = os.path.join(static_dir, "static")
 
 if os.path.exists(inner_static):
