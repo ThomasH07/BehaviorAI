@@ -1,3 +1,4 @@
+#AWS app runner 
 FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 
@@ -18,7 +19,6 @@ COPY backend/ .
 
 COPY --from=frontend-build /app/frontend/build ./static
 
-#apprunner
 EXPOSE 8000
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
