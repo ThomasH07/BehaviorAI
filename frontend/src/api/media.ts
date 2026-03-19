@@ -5,7 +5,7 @@ export async function uploadRecordingBlob(file: Blob) {
   // CRA uses REACT_APP_* env vars
   const base = process.env.REACT_APP_API_BASE_URL || "http://localhost:8000";
 
-  const res = await fetch(`${base}/upload`, {
+  const res = await fetch(`${base}/analyze-video`, {
     method: "POST",
     body: formData,
   });
@@ -15,5 +15,5 @@ export async function uploadRecordingBlob(file: Blob) {
     throw new Error(text || `Upload failed (${res.status})`);
   }
 
-  return res.json();
+  return await res.json();
 }

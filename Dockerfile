@@ -22,3 +22,4 @@ COPY --from=frontend-build /app/frontend/build ./static
 EXPOSE 8000
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+#docker build -t behaviorai:latest . 

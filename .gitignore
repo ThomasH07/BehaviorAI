@@ -23,4 +23,5 @@ yarn-error.log*
 
 # backend
 */venv
+venv
 */__pycache__

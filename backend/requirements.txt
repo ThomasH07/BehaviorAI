@@ -1,6 +1,9 @@
 fastapi==0.110.0
 python-multipart==0.0.9
 uvicorn==0.29.0
+numpy==2.4.3
+mediapipe==0.10.14
+opencv-python-headless
 sqlalchemy
 psycopg2-binary
 python-dotenv

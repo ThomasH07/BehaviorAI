@@ -17,6 +17,8 @@ export default function MediaSetup() { //function to use the media setup process
 
 
     //UI components
+    const playbackVideoRef = useRef<HTMLVideoElement | null>(null);
+    // const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     const [status, setStatus] = useState<Status>("idle"); //state to track the status of the media process
     const [errorMsg, setErrorMsg] = useState<string>(""); //state to store any error messages that may occur during the media process
@@ -29,6 +31,7 @@ export default function MediaSetup() { //function to use the media setup process
     //default state stores just a temp url like blob:http://localhost:3000/… but could be extended to store the file name or other metadata if needed
     const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null); //state to store the actual recorded media file as a BLOB for download or further processing
 
+    const [analysisData, setAnalysisData] = useState<any[] | null>(null);
     //support validation
 
     const supported = 
@@ -107,7 +110,9 @@ export default function MediaSetup() { //function to use the media setup process
         recorderRef.current = recorder; //temp store recorder instance in ref for later use
 
         recorder.ondataavailable = (event) => {
+            // console.log("event data: "+ event.data.size);
             if (event.data && event.data.size > 0) {
+                console.log("Data chunk received:", event.data.size);
                 chunksRef.current.push(event.data); //store the incoming data chunks in the ref array as they arrive during recording
             }
         };
@@ -115,13 +120,22 @@ export default function MediaSetup() { //function to use the media setup process
         recorder.onstop = () => {
             const type = mimeType ?? "video/webm"; //use the selected mimetype or fallback to default webm if no specific mimetype was selected
             const blob = new Blob(chunksRef.current, { type }); //combine the recorded chunks into a single Blob representing the complete recorded media file
-
+            if (blob.size > 0) {
+              setRecordedBlob(blob); //store the recorded Blob in state for download or further processing
+              setRecordedURL(URL.createObjectURL(blob)); //store the recorded URL in state for use in the UI
+              setStatus("stopped"); //update the status to stopped after the recording has been successfully processed and stored
+              console.log("Blob ready! Size:", blob.size);
+            } else {
+                console.error("Recording failed: Blob is empty.");
+                setStatus("error");
+            }
             //reset the chunks ref for the next recording session
-            setRecordedBlob(blob); //store the recorded Blob in state for download or further processing
-            const url = URL.createObjectURL(blob); //create a temporary URL for the recorded Blob to enable playback or download
-            setRecordedURL(url); //store the recorded URL in state for use in the UI
-            setStatus("stopped"); //update the status to stopped after the recording has been successfully processed and stored
-            chunksRef.current = []; //reset the chunks ref for the next recording session
+            // setRecordedBlob(blob); //store the recorded Blob in state for download or further processing
+            // const url = URL.createObjectURL(blob); //create a temporary URL for the recorded Blob to enable playback or download
+            // setRecordedURL(url); //store the recorded URL in state for use in the UI
+            // setStatus("stopped"); //update the status to stopped after the recording has been successfully processed and stored
+            // chunksRef.current = []; //reset the chunks ref for the next recording session
+            console.log("Recording stopped. Blob size:", blob.size);
         };
 
         recorder.start(); //pass timeslice ms 
@@ -167,14 +181,6 @@ export default function MediaSetup() { //function to use the media setup process
         }
     },[recordedURL]);
 
-    //cleanup on component unmount
-    useEffect(() => {
-        return () => {
-            teardownMedia(); //ensure media resources are cleaned up when the component is unmounted to prevent memory leaks and free up camera/microphone resources
-        };
-    }, [teardownMedia]); //empty dependency array ensures this effect runs only once on mount and cleanup on unmount
-    
-
     //upload to backend func
     const uploadRecording = async () => {
         if (!recordedBlob) {
@@ -184,18 +190,29 @@ export default function MediaSetup() { //function to use the media setup process
         }
 
         setErrorMsg(""); //clear any previous error messages
-        
+        setUploading(true);
         try {
-            const data = await uploadRecordingBlob(recordedBlob);
-            console.log("Upload response:", data);
-            setStatus("stopped"); //keep status as stopped after successful upload, or could introduce a new status like "uploaded" if we want to track that separately
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : "An error occurred during upload.";
-            setErrorMsg(msg); //set the error message state to show the error that occurred during the upload process
-            setStatus("error"); //update the status to error if there was an issue with uploading the recording
-        }
-    };
-            
+          //sends the blob to the FastAPI /analyze-video endpoint
+          const res = await uploadRecordingBlob(recordedBlob);
+          
+          if (res.status === "success") {
+              console.log("Analysis Complete:", res.distractions, "events found.");
+              //store the frame-by-frame 'state' (Focused vs Distracted)
+              setAnalysisData(res.data); 
+              setStatus("stopped");
+          }
+      } catch (err) {
+          setErrorMsg("Server error during analysis.");
+          setStatus("error");
+      } finally {
+          setUploading(false);
+      }
+    };    
+    useEffect(() => {
+        return () => {
+            teardownMedia(); //ensure media resources are cleaned up when the component is unmounted to prevent memory leaks and free up camera/microphone resources
+        };
+    }, []); //empty dependency array ensures this effect runs only once on mount and cleanup on unmount  
  return (
     <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
       <h2>Recorder Setup (local file)</h2>
@@ -229,7 +246,7 @@ export default function MediaSetup() { //function to use the media setup process
           Stop recording
         </button>
 
-        <button onClick={uploadRecording} disabled={status !== "stopped" || !recordedBlob || uploading}>
+        <button onClick={uploadRecording} disabled={status === "recording" || !recordedBlob || uploading}>
             {uploading ? "Uploading..." : "Upload to backend"}
         </button>
 
@@ -265,6 +282,7 @@ export default function MediaSetup() { //function to use the media setup process
           <div>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Recorded playback</div>
             <video
+              ref={playbackVideoRef}
               src={recordedURL}
               controls
               style={{ width: "100%", maxWidth: 720, background: "#000", borderRadius: 10 }}
