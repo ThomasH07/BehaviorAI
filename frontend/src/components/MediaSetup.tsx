@@ -6,6 +6,11 @@ type Status = "idle" | "ready" | "recording" | "stopped" |"error"; //status of t
 //status covers camera status (ready, error) and recording status (recording, stopped)
 //could change later if we want to isolate and track camera and recording status separately, but for now this is sufficient
 
+type ChatMessage = { //Inidivudal structure for msg
+  id: number;
+  role: "user" | "assistant";
+  text: string;
+};
 
 export default function MediaSetup() { //function to use the media setup process
     const videoRef = useRef<HTMLVideoElement | null>(null); //reference to the DOM element
@@ -16,10 +21,22 @@ export default function MediaSetup() { //function to use the media setup process
     //blobparts are things that combine to form a blob, which is the final recorded media file
 
 
+
+
     //UI components
     const playbackVideoRef = useRef<HTMLVideoElement | null>(null);
     // const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const [micEnabled, setMicEnabled] = useState(true);
+    const [cameraEnabled, setCameraEnabled] = useState(true);
 
+    const [chatInput, setChatInput] = useState("");
+    const [messages, setMessages] = useState<ChatMessage[]>([
+      {
+        id: 1,
+        role: "assistant",
+        text: "Hi Derek — I’m ready to help. Start your recording or ask for feedback here.",
+      },
+    ]);
     const [status, setStatus] = useState<Status>("idle"); //state to track the status of the media process
     const [errorMsg, setErrorMsg] = useState<string>(""); //state to store any error messages that may occur during the media process
     const [useMic, setUseMic] = useState<boolean>(true); //state to track whether the user wants to use the microphone for audio recording
@@ -142,8 +159,59 @@ export default function MediaSetup() { //function to use the media setup process
         setStatus("recording"); //update the status to recording after starting the recording process
     };
 
+    //mic 
+    const toggleMic = () => {
+      const stream = streamRef.current;
+      if (!stream) return;
 
-    //stop w check 
+      const audioTracks = stream.getAudioTracks();
+      if (!audioTracks.length) return;
+
+      const next = !audioTracks[0].enabled;
+      audioTracks.forEach((track) => {
+        track.enabled = next;
+      });
+      setMicEnabled(next);
+    };
+    //cam
+    const toggleCamera = () => {
+      const stream = streamRef.current;
+      if (!stream) return;
+
+      const videoTracks = stream.getVideoTracks();
+      if (!videoTracks.length) return;
+
+      const next = !videoTracks[0].enabled;
+      videoTracks.forEach((track) => {
+        track.enabled = next;
+      });
+      setCameraEnabled(next);
+    };
+
+    const sendMessage = () => {
+      const trimmed = chatInput.trim();
+      if (!trimmed) return;
+
+      const userMsg: ChatMessage = {
+        id: Date.now(),
+        role: "user",
+        text: trimmed,
+      };
+
+      setMessages((prev) => [
+        ...prev,
+        userMsg,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          text: "Placeholder LLM response — connect this to your backend/chat endpoint next.",
+        },
+      ]);
+
+      setChatInput("");
+    };
+
+        //stop w check 
     const stopRecording = () => {
         const recorder = recorderRef.current;
         if (!recorder || recorder.state !== "recording") {
@@ -175,6 +243,8 @@ export default function MediaSetup() { //function to use the media setup process
         setStatus("idle"); //reset the status to idle after tearing down the media setup
         setErrorMsg(""); //clear any error messages
         setRecordedBlob(null); //clear any recorded blob
+        setMicEnabled(false); //reset mic enabled state
+        setCameraEnabled(false); //reset camera enabled state
         if (recordedURL) {
             URL.revokeObjectURL(recordedURL); //revoke any existing recorded URL to free up memory
             setRecordedURL(null); //clear the recorded URL state
@@ -188,7 +258,7 @@ export default function MediaSetup() { //function to use the media setup process
             setStatus("error"); //update the status to error if there was an issue with uploading the recording
             return;
         }
-
+        
         setErrorMsg(""); //clear any previous error messages
         setUploading(true);
         try {
@@ -200,6 +270,15 @@ export default function MediaSetup() { //function to use the media setup process
               //store the frame-by-frame 'state' (Focused vs Distracted)
               setAnalysisData(res.data); 
               setStatus("stopped");
+
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: Date.now(),
+                  role: "assistant",
+                  text: `Analysis complete. I found ${res.distractions ?? 0} distraction events.`,
+                },
+              ]);
           }
       } catch (err) {
           setErrorMsg("Server error during analysis.");
@@ -213,90 +292,444 @@ export default function MediaSetup() { //function to use the media setup process
             teardownMedia(); //ensure media resources are cleaned up when the component is unmounted to prevent memory leaks and free up camera/microphone resources
         };
     }, []); //empty dependency array ensures this effect runs only once on mount and cleanup on unmount  
- return (
-    <div style={{ padding: 16, maxWidth: 900, margin: "0 auto" }}>
-      <h2>Recorder Setup (local file)</h2>
 
-      {!supported && (
-        <p style={{ color: "crimson" }}>
-          Missing support: <code>getUserMedia</code> or <code>MediaRecorder</code>.
-        </p>
-      )}
+    const statusColor =
+      status === "recording"
+        ? "#ef4444"
+        : status === "ready"
+        ? "#22c55e"
+        : status === "error"
+        ? "#f97316"
+        : "#64748b";
+   return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0f172a",
+        color: "white",
+        padding: 20,
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.6fr 420px",
+          gap: 20,
+          alignItems: "stretch",
+        }}
+      >
+        {/* LEFT: VIDEO AREA */}
+        <div
+          style={{
+            background: "#111827",
+            border: "1px solid #1f2937",
+            borderRadius: 24,
+            padding: 16,
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 720,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+          }}
+        >
+          {/* top bar */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 14,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>Interview Room</div>
+              <div style={{ color: "#94a3b8", fontSize: 14 }}>
+                Camera preview + controls
+              </div>
+            </div>
 
-      <label style={{ display: "block", marginBottom: 10 }}>
-        <input
-          type="checkbox"
-          checked={useMic}
-          onChange={(e) => setUseMic(e.target.checked)}
-          disabled={status === "ready" || status === "recording"}
-        />{" "}
-        Include microphone
-      </label>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-        <button onClick={setupMedia} disabled={!supported || status === "recording"}>
-          Setup (ask permission)
-        </button>
-
-        <button onClick={startRecording} disabled={status !== "ready"}>
-          Start recording
-        </button>
-
-        <button onClick={stopRecording} disabled={status !== "recording"}>
-          Stop recording
-        </button>
-
-        <button onClick={uploadRecording} disabled={status === "recording" || !recordedBlob || uploading}>
-            {uploading ? "Uploading..." : "Upload to backend"}
-        </button>
-
-        <button onClick={teardownMedia} disabled={status === "recording"}>
-          Teardown (turn off cam/mic)
-        </button>
-      </div>
-
-      <div style={{ marginBottom: 10 }}>
-        <b>Status:</b> {status}
-        {errorMsg && (
-          <span style={{ color: "crimson" }}>
-            {" "}
-            — <b>Error:</b> {errorMsg}
-          </span>
-        )}
-      </div>
-
-      <div style={{ display: "grid", gap: 12 }}>
-        {/* Live preview while recording */}
-        <div>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Live preview</div>
-          <video
-            ref={videoRef}
-            style={{ width: "100%", maxWidth: 720, background: "#000", borderRadius: 10 }}
-            playsInline
-            muted
-          />
-        </div>
-
-        {/* Playback of recorded clip */}
-        {recordedURL && (
-          <div>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>Recorded playback</div>
-            <video
-              ref={playbackVideoRef}
-              src={recordedURL}
-              controls
-              style={{ width: "100%", maxWidth: 720, background: "#000", borderRadius: 10 }}
-            />
-            <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
-              {recordedBlob && (
-                <span style={{ opacity: 0.8 }}>
-                  Size: {(recordedBlob.size / 1024 / 1024).toFixed(2)} MB
-                </span>
-              )}
+            <div
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 999,
+                padding: "8px 12px",
+                fontSize: 13,
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: statusColor,
+                  display: "inline-block",
+                }}
+              />
+              {uploading ? "Uploading..." : status}
             </div>
           </div>
-        )}
+
+          {/* video box */}
+          <div
+            style={{
+              position: "relative",
+              flex: 1,
+              borderRadius: 22,
+              overflow: "hidden",
+              background: "#000",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                background: "#000",
+                display: cameraEnabled ? "block" : "none",
+              }}
+            />
+
+            {!cameraEnabled && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  background:
+                    "linear-gradient(135deg, rgba(15,23,42,1), rgba(30,41,59,1))",
+                  color: "#cbd5e1",
+                  fontSize: 20,
+                  fontWeight: 600,
+                }}
+              >
+                Camera is off
+              </div>
+            )}
+
+            {/* small badges */}
+            <div
+              style={{
+                position: "absolute",
+                top: 16,
+                left: 16,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  background: "rgba(0,0,0,0.45)",
+                  backdropFilter: "blur(8px)",
+                  borderRadius: 999,
+                  padding: "8px 12px",
+                  fontSize: 13,
+                }}
+              >
+                {micEnabled ? "Mic on" : "Mic off"}
+              </div>
+
+              <div
+                style={{
+                  background: "rgba(0,0,0,0.45)",
+                  backdropFilter: "blur(8px)",
+                  borderRadius: 999,
+                  padding: "8px 12px",
+                  fontSize: 13,
+                }}
+              >
+                {cameraEnabled ? "Camera on" : "Camera off"}
+              </div>
+            </div>
+
+            {/* bottom control bar */}
+            <div
+              style={{
+                position: "absolute",
+                left: 16,
+                right: 16,
+                bottom: 16,
+                display: "flex",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  padding: 12,
+                  borderRadius: 999,
+                  background: "rgba(15,23,42,0.8)",
+                  backdropFilter: "blur(14px)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  flexWrap: "wrap",
+                  justifyContent: "center",
+                }}
+              >
+                <button onClick={setupMedia} disabled={!supported || status === "recording"} style={controlBtn}>
+                  Setup
+                </button>
+
+                <button onClick={toggleMic} disabled={!streamRef.current} style={controlBtn}>
+                  {micEnabled ? "Mute" : "Unmute"}
+                </button>
+
+                <button onClick={toggleCamera} disabled={!streamRef.current} style={controlBtn}>
+                  {cameraEnabled ? "Cam Off" : "Cam On"}
+                </button>
+
+                <button onClick={startRecording} disabled={status !== "ready"} style={primaryBtn}>
+                  Record
+                </button>
+
+                <button onClick={stopRecording} disabled={status !== "recording"} style={controlBtn}>
+                  Stop
+                </button>
+
+                <button
+                  onClick={uploadRecording}
+                  disabled={status === "recording" || !recordedBlob || uploading}
+                  style={controlBtn}
+                >
+                  {uploading ? "Uploading..." : "Analyze"}
+                </button>
+
+                <button onClick={teardownMedia} disabled={status === "recording"} style={dangerBtn}>
+                  End
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* footer area under video */}
+          <div
+            style={{
+              marginTop: 14,
+              display: "grid",
+              gridTemplateColumns: recordedURL ? "1fr 1fr" : "1fr",
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                background: "#0f172a",
+                borderRadius: 18,
+                border: "1px solid #1f2937",
+                padding: 14,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Session Info</div>
+              <div style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.6 }}>
+                <div>Status: {status}</div>
+                <div>Microphone requested: {useMic ? "Yes" : "No"}</div>
+                <div>Backend analysis: {analysisData ? "Available" : "Not yet"}</div>
+                {errorMsg && <div style={{ color: "#fca5a5" }}>Error: {errorMsg}</div>}
+              </div>
+            </div>
+
+            {recordedURL && (
+              <div
+                style={{
+                  background: "#0f172a",
+                  borderRadius: 18,
+                  border: "1px solid #1f2937",
+                  padding: 14,
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Recorded Preview</div>
+                <video
+                  ref={playbackVideoRef}
+                  src={recordedURL}
+                  controls
+                  style={{
+                    width: "100%",
+                    maxHeight: 180,
+                    background: "#000",
+                    borderRadius: 12,
+                  }}
+                />
+                {recordedBlob && (
+                  <div style={{ marginTop: 8, color: "#94a3b8", fontSize: 13 }}>
+                    Size: {(recordedBlob.size / 1024 / 1024).toFixed(2)} MB
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT: CHAT PANEL */}
+        <aside
+          style={{
+            background: "#111827",
+            border: "1px solid #1f2937",
+            borderRadius: 24,
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 720,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              padding: 18,
+              borderBottom: "1px solid #1f2937",
+              background: "#0f172a",
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700 }}>AI Assistant</div>
+            <div style={{ color: "#94a3b8", fontSize: 14, marginTop: 4 }}>
+              Live coaching, feedback, and analysis chat
+            </div>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              padding: 16,
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              background: "#111827",
+            }}
+          >
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                style={{
+                  alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                  maxWidth: "85%",
+                  padding: "12px 14px",
+                  borderRadius: 16,
+                  background: msg.role === "user" ? "#2563eb" : "#1e293b",
+                  color: "white",
+                  lineHeight: 1.5,
+                  fontSize: 14,
+                }}
+              >
+                {msg.text}
+              </div>
+            ))}
+          </div>
+
+          <div
+            style={{
+              padding: 16,
+              borderTop: "1px solid #1f2937",
+              background: "#0f172a",
+            }}
+          >
+            <div style={{ display: "flex", gap: 10 }}>
+              <input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") sendMessage();
+                }}
+                placeholder="Ask the LLM for feedback..."
+                style={{
+                  flex: 1,
+                  background: "#111827",
+                  border: "1px solid #334155",
+                  color: "white",
+                  borderRadius: 12,
+                  padding: "12px 14px",
+                  outline: "none",
+                }}
+              />
+              <button onClick={sendMessage} style={primaryBtn}>
+                Send
+              </button>
+            </div>
+
+            <div
+              style={{
+                marginTop: 12,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                style={chipBtn}
+                onClick={() =>
+                  setChatInput("Give me a quick summary of my interview performance.")
+                }
+              >
+                Performance summary
+              </button>
+              <button
+                style={chipBtn}
+                onClick={() =>
+                  setChatInput("What distractions did you detect in this session?")
+                }
+              >
+                Distractions
+              </button>
+              <button
+                style={chipBtn}
+                onClick={() =>
+                  setChatInput("How can I improve eye contact and body language?")
+                }
+              >
+                Improvement tips
+              </button>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
-}   
+}
+
+const controlBtn: React.CSSProperties = {
+  background: "#1e293b",
+  color: "white",
+  border: "1px solid #334155",
+  borderRadius: 999,
+  padding: "12px 16px",
+  cursor: "pointer",
+  fontWeight: 600,
+};
+
+const primaryBtn: React.CSSProperties = {
+  background: "#2563eb",
+  color: "white",
+  border: "none",
+  borderRadius: 999,
+  padding: "12px 18px",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const dangerBtn: React.CSSProperties = {
+  background: "#dc2626",
+  color: "white",
+  border: "none",
+  borderRadius: 999,
+  padding: "12px 18px",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const chipBtn: React.CSSProperties = {
+  background: "#1e293b",
+  color: "#e2e8f0",
+  border: "1px solid #334155",
+  borderRadius: 999,
+  padding: "8px 12px",
+  cursor: "pointer",
+  fontSize: 13,
+};
