@@ -3,7 +3,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import traceback
 
-# Load variables from .env
+#load variables from .env
 load_dotenv()
 
 class GeminiService:
@@ -15,7 +15,7 @@ class GeminiService:
             
         genai.configure(api_key=self.api_key)
         
-        # Switched to the standard stable identifier to fix the 404 error
+        #switched to the standard stable identifier to fix the 404 error
         self.model_name = "gemini-2.5-flash"
         try:
             self.model = genai.GenerativeModel(self.model_name)
@@ -60,9 +60,6 @@ class GeminiService:
         except Exception as e:
             error_str = str(e)
             print(f"GEMINI ERROR: {error_str}")
-            #If 404 persists, it may be due to regional restrictions or API versioning
-            if "404" in error_str:
-                print("💡 TIP: Verify your API key is from Google AI Studio and has access to Gemini 1.5 Flash.")
             return None
 
 gemini_service = GeminiService()
