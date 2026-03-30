@@ -68,6 +68,8 @@ export default function MediaSetup() { //function to use the media setup process
             setRecordedURL(null); //reset the recorded URL state
         }
         setRecordedBlob(null); //reset the recorded blob state to clear any previous recording data
+        setMicEnabled(useMic); //set the mic enabled state based on the current useMic value, which determines whether the audio stream will be requested from the user's microphone during media setup
+        setCameraEnabled(true); //set the camera enabled state to true during media setup, as we are requesting the video stream from the user's camera and want the live preview to be visible by default
 
         try {
             //recording ONLY, not streaming to server
@@ -346,21 +348,25 @@ export default function MediaSetup() { //function to use the media setup process
           }}
         >
           {/* top bar */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 14,
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>Interview Room</div>
-              <div style={{ color: "#94a3b8", fontSize: 14 }}>
-                Camera preview + controls
-              </div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 14,
+          }}
+        >
+          {/* LEFT SIDE: title/subtitle */}
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>Interview Room</div>
+            <div style={{ color: "#94a3b8", fontSize: 14 }}>
+              Camera preview + controls
             </div>
+          </div>
 
+          {/* RIGHT SIDE: status pill + user icon */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* switched: kept only ONE status pill */}
             <div
               style={{
                 background: "rgba(255,255,255,0.06)",
@@ -384,7 +390,29 @@ export default function MediaSetup() { //function to use the media setup process
               />
               {uploading ? "Uploading..." : status}
             </div>
+
+            {/* switched: added user icon button */}
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: "50%",
+                background: "#1e293b",
+                border: "1px solid #334155",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 18,
+                fontWeight: 700,
+                color: "#e2e8f0",
+                cursor: "pointer",
+              }}
+              title="User Profile"
+            >
+              👤
+            </div>
           </div>
+        </div>
 
           {/* video box */}
           <div
@@ -443,7 +471,7 @@ export default function MediaSetup() { //function to use the media setup process
               <div
                 style={{
                   background: "rgba(0,0,0,0.45)",
-                  backdropFilter: "blur(8px)",
+                  // backdropFilter: "blur(8px)",
                   borderRadius: 999,
                   padding: "8px 12px",
                   fontSize: 13,
@@ -455,7 +483,7 @@ export default function MediaSetup() { //function to use the media setup process
               <div
                 style={{
                   background: "rgba(0,0,0,0.45)",
-                  backdropFilter: "blur(8px)",
+                  // backdropFilter: "blur(8px)",
                   borderRadius: 999,
                   padding: "8px 12px",
                   fontSize: 13,
@@ -483,7 +511,7 @@ export default function MediaSetup() { //function to use the media setup process
                   padding: 12,
                   borderRadius: 999,
                   background: "rgba(15,23,42,0.8)",
-                  backdropFilter: "blur(14px)",
+                  // backdropFilter: "blur(14px)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   flexWrap: "wrap",
                   justifyContent: "center",
