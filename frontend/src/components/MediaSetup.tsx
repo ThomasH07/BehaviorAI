@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
-import { uploadRecordingBlob } from "../api/media";
+import { uploadRecordingBlob, transcribeAudioBlob } from "../api/media";
 
 type Status = "idle" | "ready" | "recording" | "stopped" |"error"; //status of the media process
 //status covers camera status (ready, error) and recording status (recording, stopped)
@@ -25,7 +25,6 @@ export default function MediaSetup() { //function to use the media setup process
 
     //UI components
     const playbackVideoRef = useRef<HTMLVideoElement | null>(null);
-    // const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [micEnabled, setMicEnabled] = useState(true);
     const [cameraEnabled, setCameraEnabled] = useState(true);
 
@@ -263,26 +262,40 @@ export default function MediaSetup() { //function to use the media setup process
         setUploading(true);
         try {
           //sends the blob to the FastAPI /analyze-video endpoint
-          const res = await uploadRecordingBlob(recordedBlob);
-          
-          if (res.status === "success") {
-              console.log("Analysis Complete:", res.distractions, "events found.");
-              //store the frame-by-frame 'state' (Focused vs Distracted)
-              setAnalysisData(res.data); 
-              setStatus("stopped");
-
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: Date.now(),
-                  role: "assistant",
-                  text: `Analysis complete. I found ${res.distractions ?? 0} distraction events.`,
-                },
-              ]);
-          }
+          const [visionRes, transcribeRes] = await Promise.all([
+            uploadRecordingBlob(recordedBlob),
+            transcribeAudioBlob(recordedBlob)
+          ]);
+          // console.log("Transcribe Result Object:", transcribeRes);
+          if (transcribeRes.status === "success") {
+            // 1. Backend now sends 'transcript' instead of 'text'
+            const detectedText = transcribeRes.data?.transcript?.trim() || "(No speech detected)";
+            const distractions = visionRes.distractions ?? 0;
+            
+            // 2. Access the new behavioral data Gemini is sending
+            const sentiment = transcribeRes.data?.sentiment || "Neutral";
+            const stutters = transcribeRes.data?.stutters || 0;
+            const feedback = transcribeRes.data?.feedback || "";
+        
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now(),
+                role: "assistant",
+                text: `Analysis complete! 
+                       I heard: "${detectedText}"
+                       
+                       Behavioral Stats:
+                       • Sentiment: ${sentiment}
+                       • Stutters/Fillers: ${stutters}
+                       • Distractions: ${distractions}
+                       
+                       Coach Feedback: ${feedback}`,
+              },
+            ]);
+        }
       } catch (err) {
-          setErrorMsg("Server error during analysis.");
-          setStatus("error");
+          console.error("error:", err);
       } finally {
           setUploading(false);
       }
