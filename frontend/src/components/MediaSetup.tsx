@@ -46,7 +46,6 @@ export default function MediaSetup() { //function to use the media setup process
     const [recordedURL, setRecordedURL] = useState<string | null>(null); //state to store the URL of the recorded media file for playback or download
     //default state stores just a temp url like blob:http://localhost:3000/… but could be extended to store the file name or other metadata if needed
     const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null); //state to store the actual recorded media file as a BLOB for download or further processing
-    const [transcribeBlob, setTranscribeBlob] = useState<Blob | null>(null);
 
     const [analysisData, setAnalysisData] = useState<any[] | null>(null);
     //support validation
