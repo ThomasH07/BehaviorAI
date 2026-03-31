@@ -104,7 +104,7 @@ class Vision:
                     duration = video_time_sec - distraction_start_time
                     
                     #if it has been 2 seconds, and we haven't logged it yet
-                    if duration >= 2.0 and not logged_this_distraction:
+                    if duration >= 1.0 and not logged_this_distraction:
                         distraction_count += 1
                         
                         # MM:SS
