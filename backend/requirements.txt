@@ -2,7 +2,7 @@ fastapi==0.110.0
 python-multipart==0.0.9
 uvicorn==0.29.0
 numpy
-mediapipe
+mediapipe==0.10.20
 opencv-python-headless
 sqlalchemy
 psycopg2-binary
@@ -10,3 +10,4 @@ python-dotenv
 pydantic[email]
 email-validator
 google-generativeai
+ffmpeg
