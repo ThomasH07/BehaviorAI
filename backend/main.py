@@ -25,15 +25,15 @@ app.add_middleware(
 )
 @app.post("/analyze-video")
 def analyze_video(file: UploadFile = File(...)):
-    # 1. Handle File IO
+    #handle File IO
     temp_filename = f"temp_{file.filename}"
     with open(temp_filename, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    # 2. Call the Vision Service
+    #call the Vision Service
     try:
         data, distractions = vision_service.analyze_video_file(temp_filename)
     finally:
-        # 3. Clean up
+        #clean up
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
 
