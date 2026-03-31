@@ -10,4 +10,4 @@ python-dotenv
 pydantic[email]
 email-validator
 google-generativeai
-ffmpeg
+imageio-ffmpeg

@@ -14,6 +14,7 @@ import json
 models.Base.metadata.create_all(bind=engine) # creates the tables in AWS RDS if they don't exist yet
 from vision import vision_service
 from gemini_service import gemini_service
+import imageio_ffmpeg
 app = FastAPI()
 
 app.add_middleware(
@@ -49,10 +50,10 @@ def process_behavior(file: UploadFile = File(...)):
         #save incoming recording
         with open(temp_webm, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-
+        ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
         #fast FFmpeg conversion (No video, Mono, 16kHz)
         subprocess.run([
-            "ffmpeg", "-y", "-i", temp_webm, 
+            ffmpeg_path, "-y", "-i", temp_webm, 
             "-vn", "-ar", "16000", "-ac", "1", temp_wav
         ], check=True, capture_output=True)
 
