@@ -18,6 +18,25 @@ class User(UserBase):
     class Config:
         from_attributes = True
 
+class UserOut(UserBase):
+    user_id: int
+
+    class Config:
+        from_attributes = True
+
+class SignupRequest(BaseModel):
+    user_name: str
+    user_email: EmailStr
+    user_password: str
+
+class LoginRequest(BaseModel):
+    user_email: EmailStr
+    user_password: str
+
+class AuthStatus(BaseModel):
+    authenticated: bool
+    user: Optional[UserOut] = None
+
 # RESPONSE SCHEMAS 
 class ResponseBase(BaseModel):
     interview_prompt: str

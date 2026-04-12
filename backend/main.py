@@ -1,6 +1,9 @@
 import subprocess
 import os
-from fastapi import FastAPI, Depends, UploadFile, File
+import secrets
+import hashlib
+from datetime import datetime, timedelta
+from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +11,7 @@ from database import engine, SessionLocal
 import models
 import schemas
 from sqlalchemy.orm import Session
+from passlib.context import CryptContext
 #mediapipe
 import shutil
 import json
@@ -17,13 +21,65 @@ from gemini_service import gemini_service
 import imageio_ffmpeg
 app = FastAPI()
 
+cors_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000",
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000","http://localhost:3000"], 
+    allow_origins=[origin.strip() for origin in cors_origins if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "behaviorai_session")
+SESSION_DURATION_DAYS = int(os.getenv("SESSION_DURATION_DAYS", "7"))
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+MIN_PASSWORD_LENGTH = int(os.getenv("MIN_PASSWORD_LENGTH", "12"))
+MAX_BCRYPT_BYTES = 72
+
+def normalize_password(password: str) -> str:
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password must be at least {MIN_PASSWORD_LENGTH} characters long",
+        )
+    if len(password.encode("utf-8")) > MAX_BCRYPT_BYTES:
+        return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    return password
+
+def hash_password(password: str) -> str:
+    normalized = normalize_password(password)
+    return pwd_context.hash(normalized)
+
+def verify_password(plain_password: str, stored_password: str) -> tuple[bool, bool]:
+    """
+    Returns (is_valid, needs_upgrade).
+    If the stored password is plaintext, it is treated as valid only on exact match.
+    """
+    normalized_password = normalize_password(plain_password)
+    if pwd_context.identify(stored_password):
+        valid = pwd_context.verify(normalized_password, stored_password)
+        return valid, valid and pwd_context.needs_update(stored_password)
+    if normalized_password == stored_password:
+        return True, True
+    return False, False
+
+def set_session_cookie(response: Response, session_id: str, max_age_seconds: int) -> None:
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_id,
+        httponly=True,
+        max_age=max_age_seconds,
+        samesite="lax",
+        secure=SESSION_COOKIE_SECURE,
+    )
+
+def clear_session_cookie(response: Response) -> None:
+    response.delete_cookie(key=SESSION_COOKIE_NAME)
 @app.post("/analyze-video")
 def analyze_video(file: UploadFile = File(...)):
     #handle File IO
@@ -87,18 +143,117 @@ def get_db():
     finally:
         db.close()
 
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> models.User:
+    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    auth_session = (
+        db.query(models.AuthSession)
+        .filter(models.AuthSession.session_id == session_id)
+        .first()
+    )
+    if not auth_session or auth_session.revoked or auth_session.expires_at <= datetime.utcnow():
+        raise HTTPException(status_code=401, detail="Session expired")
+    user = db.query(models.User).filter(models.User.user_id == auth_session.user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
 @app.post("/api/users/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     """Creates a new user account for BehaviorAI."""
+    existing_email = db.query(models.User).filter(models.User.user_email == user.user_email).first()
+    if existing_email:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    existing_name = db.query(models.User).filter(models.User.user_name == user.user_name).first()
+    if existing_name:
+        raise HTTPException(status_code=409, detail="Username already taken")
     db_user = models.User(
         user_name=user.user_name,
         user_email=user.user_email,
-        user_password=user.user_password  
+        user_password=hash_password(user.user_password)
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
+
+@app.post("/api/auth/signup", response_model=schemas.UserOut)
+def signup(payload: schemas.SignupRequest, response: Response, db: Session = Depends(get_db)):
+    existing_email = db.query(models.User).filter(models.User.user_email == payload.user_email).first()
+    if existing_email:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    existing_name = db.query(models.User).filter(models.User.user_name == payload.user_name).first()
+    if existing_name:
+        raise HTTPException(status_code=409, detail="Username already taken")
+
+    db_user = models.User(
+        user_name=payload.user_name,
+        user_email=payload.user_email,
+        user_password=hash_password(payload.user_password),
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    session_id = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(days=SESSION_DURATION_DAYS)
+    db_session = models.AuthSession(
+        session_id=session_id,
+        user_id=db_user.user_id,
+        expires_at=expires_at,
+        revoked=False,
+    )
+    db.add(db_session)
+    db.commit()
+    set_session_cookie(response, session_id, SESSION_DURATION_DAYS * 24 * 60 * 60)
+    return db_user
+
+@app.post("/api/auth/login", response_model=schemas.UserOut)
+def login(payload: schemas.LoginRequest, response: Response, db: Session = Depends(get_db)):
+    db_user = db.query(models.User).filter(models.User.user_email == payload.user_email).first()
+    if not db_user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    valid, needs_upgrade = verify_password(payload.user_password, db_user.user_password)
+    if not valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    if needs_upgrade:
+        db_user.user_password = hash_password(payload.user_password)
+        db.add(db_user)
+        db.commit()
+
+    session_id = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(days=SESSION_DURATION_DAYS)
+    db_session = models.AuthSession(
+        session_id=session_id,
+        user_id=db_user.user_id,
+        expires_at=expires_at,
+        revoked=False,
+    )
+    db.add(db_session)
+    db.commit()
+    set_session_cookie(response, session_id, SESSION_DURATION_DAYS * 24 * 60 * 60)
+    return db_user
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    if session_id:
+        auth_session = (
+            db.query(models.AuthSession)
+            .filter(models.AuthSession.session_id == session_id)
+            .first()
+        )
+        if auth_session:
+            auth_session.revoked = True
+            db.add(auth_session)
+            db.commit()
+    clear_session_cookie(response)
+    return {"status": "ok"}
+
+@app.get("/api/auth/me", response_model=schemas.UserOut)
+def me(current_user: models.User = Depends(get_current_user)):
+    return current_user
 
 @app.post("/api/sessions/", response_model=schemas.Session)
 def create_session(session: schemas.SessionCreate, db: Session = Depends(get_db)):

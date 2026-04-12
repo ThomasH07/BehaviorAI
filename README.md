@@ -38,6 +38,7 @@ Windows
 and 
 
 `pip install -r requirements.txt`
+
 ## Available Scripts
 
 In the project directory, you can run:

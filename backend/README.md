@@ -41,3 +41,14 @@ http://127.0.0.1:8000/docs
 ## Constraints
 
 Due to Foreign Key constraints, a Response cannot be created without an existing Session, and a Session cannot be created without a valid User
+
+### Auth + sessions
+- Added cookie-based auth with signup/login/logout + session lookup.
+- Passwords are hashed with bcrypt (auto-upgrades plaintext or legacy hashes on login).
+- Added `auth_sessions` table to track session id, expiry, and revocation.
+
+### New endpoints
+- `POST /api/auth/signup`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`

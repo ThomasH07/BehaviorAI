@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
+import type { AuthUser } from "../api/auth";
 import { uploadRecordingBlob, transcribeAudioBlob } from "../api/media";
 
 type Status = "idle" | "ready" | "recording" | "stopped" |"error"; //status of the media process
@@ -12,7 +13,11 @@ type ChatMessage = { //Inidivudal structure for msg
   text: string;
 };
 
-export default function MediaSetup() { //function to use the media setup process
+type MediaSetupProps = {
+  user: AuthUser;
+};
+
+export default function MediaSetup({ user }: MediaSetupProps) { //function to use the media setup process
     const videoRef = useRef<HTMLVideoElement | null>(null); //reference to the DOM element
     const streamRef = useRef<MediaStream | null>(null); //reference to the media stream stored from getUserMedia API
     const recorderRef = useRef<MediaRecorder | null>(null); //reference to the media recorder instance
@@ -29,11 +34,14 @@ export default function MediaSetup() { //function to use the media setup process
     const [cameraEnabled, setCameraEnabled] = useState(true);
 
     const [chatInput, setChatInput] = useState("");
-    const [messages, setMessages] = useState<ChatMessage[]>([
+    const displayName = user.user_name?.trim();
+    const welcomeName = displayName ? displayName : "there";
+    const initialGreeting = `Hi ${welcomeName} — I'm ready to help. Start your recording or ask for feedback here.`;
+    const [messages, setMessages] = useState<ChatMessage[]>(() => [
       {
         id: 1,
         role: "assistant",
-        text: "Hi Derek — I’m ready to help. Start your recording or ask for feedback here.",
+        text: initialGreeting,
       },
     ]);
     const [status, setStatus] = useState<Status>("idle"); //state to track the status of the media process

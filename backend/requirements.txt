@@ -3,6 +3,7 @@ python-multipart==0.0.9
 uvicorn==0.29.0
 numpy
 mediapipe==0.10.18
+protobuf==4.25.3
 opencv-python-headless
 sqlalchemy
 psycopg2-binary
@@ -11,3 +12,5 @@ pydantic[email]
 email-validator
 google-generativeai
 imageio-ffmpeg
+passlib[bcrypt]
+bcrypt==4.0.1
