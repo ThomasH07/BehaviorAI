@@ -15,6 +15,10 @@ class Vision:
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
+        #callibration
+        self.baseline = {"yaw": 0.5, "iris": 0.5}
+        self.calibrating = True
+        self.calibration_data = {"yaw": [], "iris": []}
 
     def log_distraction_to_db(self, timestamp: str, reason: str, frame_num: int):
         print(f" Time: {timestamp} | Frame: {frame_num} | Event: ({reason})")
@@ -27,14 +31,7 @@ class Vision:
             right_cheek_x = landmarks[454]["x"]
             #calculate the total width of the face in pixels
             face_width = right_cheek_x - left_cheek_x
-            if face_width != 0:
-                #calculate where the nose is relative to the face width looking straight = 0.5, closer to 0 = turned left, closer to 1 = turned right
-                head_yaw_ratio = (nose_x - left_cheek_x) / face_width
-               
-                if head_yaw_ratio < 0.25:
-                    return "Head turned far left"
-                elif head_yaw_ratio > 0.75:
-                    return "Head turned far right"
+            raw_yaw = (nose_x - left_cheek_x) / face_width if face_width != 0 else 0.5
 
             #eye movement left_eye_boundary_landmarks
             left_iris_x = landmarks[468]["x"]
@@ -42,15 +39,35 @@ class Vision:
             outer_eye_x = landmarks[33]["x"]
             #calculate the total width of the eye opening
             eye_width = inner_eye_x - outer_eye_x
-            if eye_width != 0:
-                #calculate where the iris is relative to the eye width.
-                iris_ratio = (left_iris_x - outer_eye_x) / eye_width
-                #lowered/Raised bounds to make it sensitive to slight glances
-                if iris_ratio < 0.35:
-                    return "Eyes darted left"
-                elif iris_ratio > 0.65:
-                    return "Eyes darted right"
-        except IndexError:
+            raw_iris = (left_iris_x - outer_eye_x) / eye_width if eye_width != 0 else 0.5
+
+            #calibration logic
+            if self.calibrating:
+                self.calibration_data["yaw"].append(raw_yaw)
+                self.calibration_data["iris"].append(raw_iris)
+                
+                #after 45 frames (~1.5 seconds at 30fps), set the baseline
+                if len(self.calibration_data["yaw"]) >= 45:
+                    self.baseline["yaw"] = sum(self.calibration_data["yaw"]) / 45
+                    self.baseline["iris"] = sum(self.calibration_data["iris"]) / 45
+                    self.calibrating = False
+                    print(f"CALIBRATION COMPLETE: Yaw={self.baseline['yaw']:.2f}, Iris={self.baseline['iris']:.2f}")
+                return "Calibrating..."
+
+            #compare raw values to baseline
+            #head movement (Detection sensitivity adjusted to 0.15 deviation)
+            if raw_yaw < (self.baseline["yaw"] - 0.18):
+                return "Head turned far left"
+            elif raw_yaw > (self.baseline["yaw"] + 0.18):
+                return "Head turned far right"
+
+            #eye movement
+            if raw_iris < (self.baseline["iris"] - 0.12):
+                return "Eyes darted left"
+            elif raw_iris > (self.baseline["iris"] + 0.12):
+                return "Eyes darted right"
+            
+        except (IndexError, KeyError):
             return "Face not fully visible"
         return "Focused"
 
@@ -78,19 +95,16 @@ class Vision:
             results = self.face_mesh.process(image_rgb)
             
             focus_state = "Face not visible" #default state if no face is found
-            
+            landmarks_data = [] 
             if results.multi_face_landmarks:
-                landmarks = []
+                face_landmarks = results.multi_face_landmarks[0]
                 h, w, _ = frame.shape
                 #convert MediaPipe's normalized coordinates into actual pixel coordinates
-                for lm in results.multi_face_landmarks[0].landmark:
-                    landmarks.append({
-                        "x": int(lm.x * w), 
-                        "y": int(lm.y * h), 
-                    })
+                for lm in face_landmarks.landmark:
+                    landmarks_data.append({"x": int(lm.x * w), "y": int(lm.y * h)})
             
                 #checks the users head/eyes if they are distracted
-                focus_state = self.check_focus(landmarks)
+                focus_state = self.check_focus(landmarks_data)
 
             #distraction logic
             if focus_state != "Focused":
