@@ -1,0 +1,1 @@
+declare module '*.css'; //Tell TypeScript that we can import CSS files as modules
