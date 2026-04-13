@@ -14,3 +14,4 @@ google-generativeai
 imageio-ffmpeg
 passlib[bcrypt]
 bcrypt==4.0.1
+faster-whisper

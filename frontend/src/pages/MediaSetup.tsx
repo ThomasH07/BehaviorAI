@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 
 import type { AuthUser } from "../api/auth";
-import { uploadRecordingBlob, transcribeAudioBlob } from "../api/media";
+import {
+  createResponse,
+  createSession,
+  fetchRandomQuestion,
+  uploadRecordingBlob,
+  transcribeAudioBlob,
+} from "../api/media";
 import ChatPanel, { type ChatMessage } from "../components/ChatPanel";
 import InterviewPanel from "../components/InterviewPanel";
 
@@ -50,6 +56,7 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
     const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null); //state to store the actual recorded media file as a BLOB for download or further processing
 
     const [analysisData, setAnalysisData] = useState<any[] | null>(null);
+    const [currentQuestion, setCurrentQuestion] = useState<string>("");
     //support validation
     const [sessionEnded, setSessionEnded] = useState(false);
 
@@ -66,6 +73,7 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
     const setupMedia = async () => {
         setSessionEnded(false);
         setAnalysisData(null);
+      setCurrentQuestion("");
         setErrorMsg(""); //reset any previous error messages
         if (recordedURL) {
             URL.revokeObjectURL(recordedURL); //revoke the previous recorded URL to free up memory
@@ -111,6 +119,26 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
             setStatus("error");
             return;
         }
+
+        setCurrentQuestion("");
+
+      fetchRandomQuestion()
+        .then((questionRes) => {
+          const questionText = questionRes?.question?.trim();
+          if (questionText) {
+            setCurrentQuestion(questionText);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now(),
+                text: `Question: ${questionText}`,
+              },
+            ]);
+          }
+        })
+        .catch((err) => {
+          console.warn("Question fetch failed:", err);
+        });
         
         //revoke old recorded URL if it exists to free up memory before starting a new recording session
         if (recordedURL) {
@@ -222,11 +250,45 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
 
         setRecordedBlob(null);
         setAnalysisData(null);
+        setCurrentQuestion("");
         chunksRef.current = [];
         setStatus("ready");
     };
 
-    const endSession = () => {
+    const endSession = async () => {
+      const latestAnalysis = analysisData?.[0];
+
+      if (latestAnalysis) {
+        setUploading(true);
+        setErrorMsg("");
+        try {
+          const session = await createSession(user.user_id);
+          const pausesValue = latestAnalysis.pauses;
+          const pauseCount = Array.isArray(pausesValue)
+            ? pausesValue.length
+            : typeof pausesValue === "number"
+            ? pausesValue
+            : 0;
+
+          await createResponse({
+            session_id: session.session_id,
+            interview_prompt: currentQuestion || "Question not captured.",
+            transcript: latestAnalysis.transcript || "",
+            ai_feedback: latestAnalysis.feedback || "",
+            gaze_count: latestAnalysis.distractions || 0,
+            stutter_count: latestAnalysis.stutters || 0,
+            pause_count: pauseCount,
+          });
+        } catch (err) {
+          console.error("Session save failed:", err);
+          setErrorMsg("Could not save this session. Please try End again.");
+          setUploading(false);
+          return;
+        } finally {
+          setUploading(false);
+        }
+      }
+
       setSessionEnded(true);
       teardownMedia();
     };
@@ -292,6 +354,7 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
                 transcript: transcribeRes.data?.transcript || "",
                 sentiment: transcribeRes.data?.sentiment || "Neutral",
                 stutters: transcribeRes.data?.stutters || 0,
+                pauses: transcribeRes.data?.pauses || [],
                 distractions: visionRes.distractions ?? 0,
                 feedback: transcribeRes.data?.feedback || "",
               },

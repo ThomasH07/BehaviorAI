@@ -62,4 +62,26 @@ class GeminiService:
             print(f"GEMINI ERROR: {error_str}")
             return None
 
+    def generate_behavioral_question(self) -> str | None:
+        if not self.api_key or not getattr(self, "model", None):
+            return None
+
+        try:
+            prompt = (
+                "Generate one concise behavioral interview question. "
+                "Return only the question text, no quotes or extra text."
+            )
+            response = self.model.generate_content(prompt)
+            if not response or not response.text:
+                return None
+
+            question = response.text.strip()
+            if question.startswith("\"") and question.endswith("\""):
+                question = question[1:-1].strip()
+            return question or None
+        except Exception as e:
+            error_str = str(e)
+            print(f"GEMINI ERROR: {error_str}")
+            return None
+
 gemini_service = GeminiService()

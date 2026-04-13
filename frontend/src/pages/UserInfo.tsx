@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { type AuthUser } from "../api/auth";
+import { fetchRecentSessions, type RecentSessionItem } from "../api/media";
 
 type UserInfoProps = {
   user: AuthUser;
@@ -48,44 +49,46 @@ function formatRecentSessions(sessions: RawSession[]): FormattedSession[] {
 
 export default function UserInfo({ user }: UserInfoProps) {
   const navigate = useNavigate();
+  const [rawSessions, setRawSessions] = useState<RawSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const rawSessions: RawSession[] = [
-    {
-      id: 1,
-      createdAt: "2026-04-13",
-      question: "Tell me about yourself.",
-      feedback:
-        "Good structure overall. Try making your answer a little more concise and lead with your strongest experience.",
-    },
-    {
-      id: 2,
-      createdAt: "2026-04-11",
-      question: "Describe a time you worked on a team.",
-      feedback:
-        "Strong example. Add a clearer result at the end so the impact is more obvious.",
-    },
-    {
-      id: 3,
-      createdAt: "2026-04-09",
-      question: "What is one challenge you faced recently?",
-      feedback:
-        "Nice explanation of the problem. Spend a bit more time on how you solved it.",
-    },
-    {
-      id: 4,
-      createdAt: "2026-04-07",
-      question: "Why do you want this role?",
-      feedback:
-        "Relevant points. Make the answer feel more specific to the company and role.",
-    },
-    {
-      id: 5,
-      createdAt: "2026-04-05",
-      question: "Tell me about a leadership experience.",
-      feedback:
-        "Good story choice. Clarify what you personally owned versus what the team did.",
-    },
-  ];
+  useEffect(() => {
+    let alive = true;
+
+    const loadRecent = async () => {
+      setLoading(true);
+      setErrorMsg("");
+      try {
+        const res = await fetchRecentSessions(user.user_id);
+        if (!alive) {
+          return;
+        }
+        const mapped = (res.sessions || []).map((session: RecentSessionItem) => ({
+          id: session.session_id,
+          createdAt: session.session_date,
+          question: session.question,
+          feedback: session.feedback,
+        }));
+        setRawSessions(mapped);
+      } catch (err) {
+        console.error("Failed loading recent sessions:", err);
+        if (alive) {
+          setErrorMsg("Could not load recent sessions right now.");
+        }
+      } finally {
+        if (alive) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadRecent();
+
+    return () => {
+      alive = false;
+    };
+  }, [user.user_id]);
 
   const recentSessions = formatRecentSessions(rawSessions);
 
@@ -124,6 +127,11 @@ export default function UserInfo({ user }: UserInfoProps) {
           <h1 style={titleStyle}>Recent Sessions</h1>
 
           <div style={sessionsWrapStyle}>
+            {loading ? <div style={statusTextStyle}>Loading recent sessions...</div> : null}
+            {!loading && errorMsg ? <div style={statusTextStyle}>{errorMsg}</div> : null}
+            {!loading && !errorMsg && recentSessions.length === 0 ? (
+              <div style={statusTextStyle}>No sessions yet. Complete an interview to see history.</div>
+            ) : null}
             {recentSessions.map((session) => (
               <div key={session.id} style={sessionCardStyle}>
                 <div style={sessionHeaderStyle}>
@@ -288,6 +296,12 @@ const sessionTextStyle: React.CSSProperties = {
 
 const sessionFeedbackStyle: React.CSSProperties = {
   color: "#cbd5e1",
+  fontSize: 14,
+  lineHeight: 1.6,
+};
+
+const statusTextStyle: React.CSSProperties = {
+  color: "#94a3b8",
   fontSize: 14,
   lineHeight: 1.6,
 };

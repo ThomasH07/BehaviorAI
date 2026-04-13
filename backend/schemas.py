@@ -70,3 +70,15 @@ class Session(SessionBase):
 
     class Config:
         from_attributes = True
+
+
+class SessionHistoryItem(BaseModel):
+    session_id: int
+    session_date: datetime
+    question: str
+    feedback: str
+
+
+class SessionHistoryResponse(BaseModel):
+    user_id: int
+    sessions: List[SessionHistoryItem]

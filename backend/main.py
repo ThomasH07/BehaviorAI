@@ -2,6 +2,7 @@ import subprocess
 import os
 import secrets
 import hashlib
+import random
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +19,7 @@ import json
 models.Base.metadata.create_all(bind=engine) # creates the tables in AWS RDS if they don't exist yet
 from vision import vision_service
 from gemini_service import gemini_service
+from whisper_service import whisper_service
 import imageio_ffmpeg
 app = FastAPI()
 
@@ -40,6 +42,14 @@ SESSION_DURATION_DAYS = int(os.getenv("SESSION_DURATION_DAYS", "7"))
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
 MIN_PASSWORD_LENGTH = int(os.getenv("MIN_PASSWORD_LENGTH", "12"))
 MAX_BCRYPT_BYTES = 72
+
+FALLBACK_QUESTIONS = [
+    "Tell me about a time you had to resolve a conflict within a team.",
+    "Describe a situation where you had to learn something quickly to complete a task.",
+    "Tell me about a time you took ownership of a mistake and what you did next.",
+    "Describe a time you had to prioritize multiple urgent tasks.",
+    "Tell me about a time you influenced someone without formal authority.",
+]
 
 def normalize_password(password: str) -> str:
     if len(password) < MIN_PASSWORD_LENGTH:
@@ -113,18 +123,8 @@ def process_behavior(file: UploadFile = File(...)):
             "-vn", "-ar", "16000", "-ac", "1", temp_wav
         ], check=True, capture_output=True)
 
-        #call the Gemini Service
-        raw_response = gemini_service.analyze_audio(temp_wav)
-        
-        if not raw_response:
-            return JSONResponse(status_code=500, content={"message": "Gemini failed to process audio"})
-
-        #clean up any Markdown wrappers (```json ... ```)
-        cleaned_json = raw_response.replace("```json", "").replace("```", "").strip()
-        
-        #parse and return
-        final_data = json.loads(cleaned_json)
-        return {"status": "success", "data": final_data}
+        final_data = whisper_service.transcribe_and_analyze(temp_wav)
+        return {"status": "success", "data": final_data, "source": "local_whisper"}
 
     except Exception as e:
         print(f"Server Error: {e}")
@@ -135,6 +135,15 @@ def process_behavior(file: UploadFile = File(...)):
         for f in [temp_webm, temp_wav]:
             if os.path.exists(f):
                 os.remove(f)
+
+@app.get("/api/questions/random")
+def get_random_question():
+    question = gemini_service.generate_behavioral_question()
+    source = "gemini"
+    if not question:
+        question = random.choice(FALLBACK_QUESTIONS)
+        source = "fallback"
+    return {"status": "success", "question": question, "source": source}
 # Ensures each API request gets its own connection that closes after use.
 def get_db():
     db = SessionLocal()
@@ -271,6 +280,36 @@ def create_response(response: schemas.ResponseCreate, db: Session = Depends(get_
     db.commit()
     db.refresh(db_response)
     return db_response
+
+
+@app.get("/api/sessions/{user_id}/recent", response_model=schemas.SessionHistoryResponse)
+def get_recent_sessions(user_id: int, db: Session = Depends(get_db)):
+    sessions = (
+        db.query(models.Session)
+        .filter(models.Session.user_id == user_id)
+        .order_by(models.Session.session_date.desc())
+        .limit(5)
+        .all()
+    )
+
+    payload = []
+    for session in sessions:
+        latest_response = (
+            db.query(models.Response)
+            .filter(models.Response.session_id == session.session_id)
+            .order_by(models.Response.sequence_tag.desc())
+            .first()
+        )
+        payload.append(
+            schemas.SessionHistoryItem(
+                session_id=session.session_id,
+                session_date=session.session_date,
+                question=(latest_response.interview_prompt if latest_response else "No question saved."),
+                feedback=(latest_response.ai_feedback if latest_response else "No feedback saved yet."),
+            )
+        )
+
+    return schemas.SessionHistoryResponse(user_id=user_id, sessions=payload)
 
 
 static_dir = os.path.join(os.getcwd(), "static")
