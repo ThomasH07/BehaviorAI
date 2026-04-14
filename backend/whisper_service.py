@@ -3,7 +3,7 @@ import re
 from typing import Any
 
 from faster_whisper import WhisperModel
-
+from groq_service import analyze_behavior_data
 
 class WhisperService:
     def __init__(self) -> None:
@@ -25,7 +25,7 @@ class WhisperService:
             )
         return self._model
 
-    def transcribe_and_analyze(self, file_path: str) -> dict[str, Any]:
+    async def transcribe_and_analyze(self, file_path: str) -> dict[str, Any]:
         model = self._get_model()
         segments, _ = model.transcribe(file_path, beam_size=5, vad_filter=True)
         segment_list = list(segments)
@@ -54,12 +54,16 @@ class WhisperService:
             sentiment = "Positive"
         elif negative_hits > positive_hits:
             sentiment = "Negative"
-
-        feedback = (
-            "Local transcription mode is active. Keep answers concise and use STAR format "
-            "(Situation, Task, Action, Result) with a clear outcome."
+        
+        behavior_summary = (          
+            f"Transcript: '{transcript}'\n"
+            f"Stutters Detected: {stutters}\n"
+            f"Filler Words Used: {filler_count}\n"
+            f"Long Pauses: {len(pauses)}\n"
+            f"Tone/Sentiment: {sentiment}"
         )
-
+        
+        feedback = await analyze_behavior_data(behavior_context=behavior_summary)
         return {
             "transcript": transcript,
             "stutters": stutters,

@@ -16,6 +16,7 @@ from passlib.context import CryptContext
 #mediapipe
 import shutil
 import json
+import asyncio
 models.Base.metadata.create_all(bind=engine) # creates the tables in AWS RDS if they don't exist yet
 from vision import vision_service
 from gemini_service import gemini_service
@@ -107,7 +108,7 @@ def analyze_video(file: UploadFile = File(...)):
     return {"status": "success", "data": data, "distractions": distractions}
     
 @app.post("/transcribe")
-def process_behavior(file: UploadFile = File(...)):
+async def process_behavior(file: UploadFile = File(...)):
     #paths for temporary processing
     temp_webm = f"temp_{file.filename}"
     temp_wav = temp_webm.replace(".webm", ".wav")
@@ -115,17 +116,23 @@ def process_behavior(file: UploadFile = File(...)):
     try:
         #save incoming recording
         with open(temp_webm, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            buffer.write(await file.read())
+            
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-        #fast FFmpeg conversion (No video, Mono, 16kHz)
-        subprocess.run([
+        
+        #use asyncio's subprocess so FFmpeg doesn't freeze the server
+        process = await asyncio.create_subprocess_exec(
             ffmpeg_path, "-y", "-i", temp_webm, 
-            "-vn", "-ar", "16000", "-ac", "1", temp_wav
-        ], check=True, capture_output=True)
+            "-vn", "-ar", "16000", "-ac", "1", temp_wav,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        #wait for FFmpeg to finish without blocking the event loop
+        await process.communicate()
 
-        final_data = whisper_service.transcribe_and_analyze(temp_wav)
+        final_data = await whisper_service.transcribe_and_analyze(temp_wav)
+        
         return {"status": "success", "data": final_data, "source": "local_whisper"}
-
     except Exception as e:
         print(f"Server Error: {e}")
         return JSONResponse(status_code=500, content={"message": str(e)})

@@ -365,15 +365,18 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
               ...prev,
               {
                 id: Date.now(),
-                text: `Analysis complete!
-                I heard: "${detectedText}"
+                text: 
+                `Analysis complete!
+                Your Response: ${detectedText}
 
                 Behavioral Stats:
-                • Sentiment: ${sentiment}
                 • Stutters/Fillers: ${stutters}
                 • Distractions: ${distractions}
 
-                Coach Feedback: ${feedback}`,
+                ${feedback}
+                `.split('\n')                     
+                .map(line => line.trimStart())  
+                .join('\n'),
               },
             ]);
           setStatus("analyzed");
