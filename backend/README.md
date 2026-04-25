@@ -20,7 +20,7 @@ backend/
 
 ## Install Dependencies
 
-pip install fastapi uvicorn sqlalchemy psycopg2-binary python-dotenv pydantic[email]
+pip install fastapi uvicorn sqlalchemy psycopg2 python-dotenv pydantic[email]
 
 
 ## Running the Server
