@@ -1,4 +1,5 @@
 #mainly for local use
+version: '3.8'
 services:
   #frontend
   frontend:
