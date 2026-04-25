@@ -27,6 +27,8 @@ app = FastAPI()
 cors_origins = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:3000,http://127.0.0.1:3000",
+    "https://behavior-ai-frontend.vercel.app",
+    ""
 ).split(",")
 
 app.add_middleware(
