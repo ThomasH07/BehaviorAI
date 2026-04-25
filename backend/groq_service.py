@@ -1,7 +1,7 @@
 import os
 from groq import AsyncGroq
 from dotenv import load_dotenv
-
+from gemini_service import GeminiService
 load_dotenv()
 
 try:
@@ -16,25 +16,28 @@ async def analyze_behavior_data(behavior_context: str, model_name: str = "llama-
     try:
         chat_completion = await client.chat.completions.create(
             messages=[
-                {
+                {   
+                    
                     "role": "system",
                     "content": (
-                        """                     
-                            Act as a hiring manager. Please evaluate my answer using the STAR method (Situation, Task, Action, Result). 
-
-                            The output should be short and concise in the following format at all times with a newline in between (DO NOT ADD ANYTHING ELSE):
-                            '
-                            Situation:
-                            \n    
-                            Task: 
-                            \n
-                            Action: 
-                            \n
-                            Result: 
-                            \n
-                            Improvement: 
-                            '
+                        f"""       
+                            Question: {GeminiService.test}
+                            Act as a hiring manager. Evaluate the user's answer (provided in the next message) using the STAR method (Situation, Task, Action, Result).
                             
+                            STRICT OUTPUT FORMAT:
+                            Situation: [Context]
+                            
+                            Task: [Context]
+                            
+                            Action: [Context]
+                            
+                            Result: [Context]
+                            
+                            Improvement: [Context]
+                            RULES:
+                            1. Provide only the format above.
+                            2. Do not include introductory text or conclusions.
+                            3. Use exactly one empty line between sections.
                         """
 
                     )

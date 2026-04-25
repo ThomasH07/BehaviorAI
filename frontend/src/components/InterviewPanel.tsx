@@ -1,6 +1,5 @@
-import React from "react";
 import { Mic, MicOff, Video, VideoOff } from "lucide-react";
-
+import React, { useState, useEffect } from "react";
 type Status = "idle" | "ready" | "recording" | "stopped" | "analyzed" | "error";
 
 type InterviewPanelProps = {
@@ -54,6 +53,33 @@ export default function InterviewPanel({
   onReset,
   onEnd,
 }: InterviewPanelProps) {
+  const [timeLeft, setTimeLeft] = useState<number>(60); // 1 minutes
+  useEffect(() => {
+    //if we aren't recording, keep the timer reset and ready
+    if (status !== "recording") {
+      setTimeLeft(60);
+      return;
+    }
+
+    //if time hits 0, trigger the stop function from props
+    if (timeLeft <= 0) {
+      console.log("4-minute limit reached. Auto-stopping...");
+      onStop();
+      return;
+    }
+
+    //tick down every second
+    const intervalId = setInterval(() => {
+      setTimeLeft((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [status, timeLeft, onStop]);
+  const formatTime = (totalSeconds: number) => {
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+    const s = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
   return (
     <div
       style={{
@@ -246,7 +272,45 @@ export default function InterviewPanel({
             {cameraEnabled ? <Video size={20} /> : <VideoOff size={20} />}
           </button>
         </div>
-
+        {status === "recording" && (
+          <div
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              zIndex: 40,
+              background: "rgba(15, 23, 42, 0.8)", 
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 999,
+              padding: "8px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                background: timeLeft <= 30 ? "#ef4444" : "#cbd5e1",
+                opacity: timeLeft <= 30 && timeLeft % 2 === 0 ? 0.4 : 1, 
+                transition: "opacity 0.2s"
+              }}
+            />
+            <span 
+              style={{ 
+                color: "#f7fafc", 
+                fontFamily: "monospace", 
+                fontSize: 16, 
+                fontWeight: 600 
+              }}
+            >
+              {formatTime(timeLeft)}
+            </span>
+          </div>
+        )}
         <div
           style={{
             position: "absolute",
