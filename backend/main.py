@@ -22,6 +22,7 @@ from vision import vision_service
 from gemini_service import gemini_service
 from whisper_service import whisper_service
 import imageio_ffmpeg
+
 app = FastAPI()
 
 cors_origins = os.getenv(
