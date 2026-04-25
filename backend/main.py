@@ -326,6 +326,35 @@ def get_recent_sessions(user_id: int, db: Session = Depends(get_db)):
     return schemas.SessionHistoryResponse(user_id=user_id, sessions=payload)
 
 
+@app.get("/api/sessions/{user_id}/{session_id}/detail", response_model=schemas.SessionDetailResponse)
+def get_session_detail(user_id: int, session_id: int, db: Session = Depends(get_db)):
+    session = (
+        db.query(models.Session)
+        .filter(models.Session.session_id == session_id, models.Session.user_id == user_id)
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    latest_response = (
+        db.query(models.Response)
+        .filter(models.Response.session_id == session_id)
+        .order_by(models.Response.sequence_tag.desc())
+        .first()
+    )
+
+    return schemas.SessionDetailResponse(
+        session_id=session.session_id,
+        session_date=session.session_date,
+        question=(latest_response.interview_prompt if latest_response else "No question saved."),
+        transcript=(latest_response.transcript if latest_response else None),
+        ai_feedback=(latest_response.ai_feedback if latest_response else None),
+        gaze_count=(latest_response.gaze_count if latest_response else None),
+        stutter_count=(latest_response.stutter_count if latest_response else None),
+    )
+
+
 static_dir = os.path.join(os.getcwd(), "static")
 inner_static = os.path.join(static_dir, "static")
 

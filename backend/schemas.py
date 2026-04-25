@@ -82,3 +82,13 @@ class SessionHistoryItem(BaseModel):
 class SessionHistoryResponse(BaseModel):
     user_id: int
     sessions: List[SessionHistoryItem]
+
+
+class SessionDetailResponse(BaseModel):
+    session_id: int
+    session_date: datetime
+    question: str
+    transcript: Optional[str] = None
+    ai_feedback: Optional[str] = None
+    gaze_count: Optional[int] = None
+    stutter_count: Optional[int] = None

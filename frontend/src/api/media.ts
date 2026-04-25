@@ -28,6 +28,17 @@ export type RecentSessionsResponse = {
   user_id: number;
   sessions: RecentSessionItem[];
 };
+
+export type SessionDetailResponse = {
+  session_id: number;
+  session_date: string;
+  question: string;
+  transcript: string | null;
+  ai_feedback: string | null;
+  gaze_count: number | null;
+  stutter_count: number | null;
+};
+
 export async function uploadRecordingBlob(file: Blob) {
   const formData = new FormData();
   formData.append("file", file, "recording.webm");
@@ -113,4 +124,17 @@ export async function fetchRecentSessions(userId: number) {
   }
 
   return (await res.json()) as RecentSessionsResponse;
+}
+
+export async function fetchSessionDetail(userId: number, sessionId: number) {
+  const res = await fetch(`${base}/api/sessions/${userId}/${sessionId}/detail`, {
+    method: "GET",
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Fetch session detail failed (${res.status})`);
+  }
+
+  return (await res.json()) as SessionDetailResponse;
 }
