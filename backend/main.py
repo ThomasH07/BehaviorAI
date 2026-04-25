@@ -91,6 +91,10 @@ def set_session_cookie(response: Response, session_id: str, max_age_seconds: int
 
 def clear_session_cookie(response: Response) -> None:
     response.delete_cookie(key=SESSION_COOKIE_NAME)
+@app.get("/")
+async def root():
+    return {"status": "Backend is running", "api_docs": "/docs"}
+
 @app.post("/analyze-video")
 def analyze_video(file: UploadFile = File(...)):
     #handle File IO
@@ -322,8 +326,9 @@ def get_recent_sessions(user_id: int, db: Session = Depends(get_db)):
 static_dir = os.path.join(os.getcwd(), "static")
 inner_static = os.path.join(static_dir, "static")
 
-if os.path.exists(inner_static):
-    app.mount("/static", StaticFiles(directory=inner_static), name="static")
+# if os.path.exists(inner_static):
+    # app.mount("/static", StaticFiles(directory=inner_static), name="static")
+
 
 @app.get("/{full_path:path}")
 async def serve_react(full_path: str):
