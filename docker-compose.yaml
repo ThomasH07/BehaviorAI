@@ -28,4 +28,6 @@ services:
     env_file:
       - ./backend/.env
       
-#docker-compose up --build
+#docker-compose up --build -d backend
+#docker ps
+#docker logs behaviorai_backend_1

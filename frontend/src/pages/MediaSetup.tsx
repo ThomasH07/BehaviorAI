@@ -346,7 +346,7 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
             const distractions = visionRes.distractions ?? 0;
             
             // 2. Access the new behavioral data Gemini is sending
-            const sentiment = transcribeRes.data?.sentiment || "Neutral";
+            // const sentiment = transcribeRes.data?.sentiment || "Neutral";
             const stutters = transcribeRes.data?.stutters || 0;
             const feedback = transcribeRes.data?.feedback || "";
             setAnalysisData([
