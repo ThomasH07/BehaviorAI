@@ -24,6 +24,7 @@ async def analyze_behavior_data(behavior_context: str, model_name: str = "llama-
                             Question: {GeminiService.last_question}
                             Act as a hiring manager. Evaluate the user's answer (provided in the next message) using the STAR method (Situation, Task, Action, Result).
 
+                        
                             STRICT OUTPUT FORMAT:
                             Situation: [Context]
                             
