@@ -4,7 +4,15 @@ from typing import Any
 
 from faster_whisper import WhisperModel
 from groq_service import analyze_behavior_data
+from huggingface_hub import login
 
+hf_token = os.getenv("HF_TOKEN")
+
+if hf_token:
+    login(token=hf_token)
+else:
+    print("Warning: HF_TOKEN not found in environment variables.")
+    
 class WhisperService:
     def __init__(self) -> None:
         self.model_size = os.getenv("WHISPER_MODEL_SIZE", "tiny")

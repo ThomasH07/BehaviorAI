@@ -22,14 +22,6 @@ from vision import vision_service
 from gemini_service import gemini_service
 from whisper_service import whisper_service
 import imageio_ffmpeg
-from huggingface_hub import login
-
-hf_token = os.getenv("HF_TOKEN")
-
-if hf_token:
-    login(token=hf_token)
-else:
-    print("Warning: HF_TOKEN not found in environment variables.")
 app = FastAPI()
 
 cors_origins = os.getenv(
