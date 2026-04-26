@@ -7,7 +7,7 @@ from groq_service import analyze_behavior_data
 
 class WhisperService:
     def __init__(self) -> None:
-        self.model_size = os.getenv("WHISPER_MODEL_SIZE", "base")
+        self.model_size = os.getenv("WHISPER_MODEL_SIZE", "tiny")
         self.device = os.getenv("WHISPER_DEVICE", "cpu")
         self.compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
         self._model: WhisperModel | None = None
@@ -27,7 +27,7 @@ class WhisperService:
 
     async def transcribe_and_analyze(self, file_path: str) -> dict[str, Any]:
         model = self._get_model()
-        segments, _ = model.transcribe(file_path, beam_size=5, vad_filter=True)
+        segments, _ = model.transcribe(file_path, beam_size=2, vad_filter=True)
         segment_list = list(segments)
 
         transcript = " ".join(seg.text.strip() for seg in segment_list).strip()
