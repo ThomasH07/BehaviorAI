@@ -27,7 +27,18 @@ services:
       - ./backend:/app
     env_file:
       - ./backend/.env
-      
-#docker-compose up --build -d backend
-#docker ps
-#docker logs behaviorai_backend_1
+
+#v1
+# sudo docker-compose up --build -d backend 
+
+#v2
+# docker compose up --build -d backend
+
+#heath check
+# docker ps
+
+#logs
+# docker logs behaviorai-backend-1 -f
+
+#usage
+# docker stats 

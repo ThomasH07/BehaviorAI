@@ -78,6 +78,9 @@ class Vision:
         analysis_results = []
         frame_idx = 0
         distraction_count = 0
+        SKIP_FRAMES = 5  
+        focus_state = "Focused"
+
         #track how long a user has been continuously distracted
         currently_distracted = False
         distraction_start_time = 0.0
@@ -90,22 +93,25 @@ class Vision:
                 break 
             #get the exact time of the current frame in seconds
             video_time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-            #mediapipe req RGB images, but opencv reads in BGR by default
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.face_mesh.process(image_rgb)
-            
-            focus_state = "Face not visible" #default state if no face is found
-            landmarks_data = [] 
-            if results.multi_face_landmarks:
-                face_landmarks = results.multi_face_landmarks[0]
-                h, w, _ = frame.shape
-                #convert MediaPipe's normalized coordinates into actual pixel coordinates
-                for lm in face_landmarks.landmark:
-                    landmarks_data.append({"x": int(lm.x * w), "y": int(lm.y * h)})
-            
-                #checks the users head/eyes if they are distracted
-                focus_state = self.check_focus(landmarks_data)
 
+            #skipping frames
+            if frame_idx % SKIP_FRAMES == 0:
+                
+                image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = self.face_mesh.process(image_rgb)
+                
+                current_focus_state = "Face not visible" 
+                if results.multi_face_landmarks:
+                    face_landmarks = results.multi_face_landmarks[0]
+                    h, w, _ = frame.shape
+                    landmarks_data = []
+                    for lm in face_landmarks.landmark:
+                        landmarks_data.append({"x": int(lm.x * w), "y": int(lm.y * h)})
+                
+                    current_focus_state = self.check_focus(landmarks_data)
+                
+                #update our "cached" state
+                focus_state = current_focus_state
             #distraction logic
             if focus_state != "Focused":
                 if not currently_distracted:
