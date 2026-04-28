@@ -405,7 +405,7 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
         : status === "error"
         ? "#f97316"
         : "#64748b";
-   return (
+  return (
     <div
       style={{
         minHeight: "100vh",
@@ -417,10 +417,13 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
     >
       <div
         style={{
+          width: "100%",
+          maxWidth: 1280,
+          margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "1.6fr 420px",
+          gridTemplateColumns: "minmax(0, 1fr) 420px",
           gap: 20,
-          alignItems: "stretch",
+          alignItems: "start",
         }}
       >
         <InterviewPanel
@@ -449,7 +452,7 @@ export default function MediaSetup({ user }: MediaSetupProps) { //function to us
           onEnd={endSession}
         />
 
-        <ChatPanel messages={messages} /> {/* RIGHT: FEEDBACK PANEL */}
+        <ChatPanel messages={messages} />
       </div>
     </div>
   );
