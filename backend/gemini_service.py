@@ -82,7 +82,7 @@ class GeminiService:
             response = self.model.generate_content(prompt,
                 generation_config=genai.types.GenerationConfig(
                     max_output_tokens=260, 
-                    temperature=0.7
+                    temperature=0.8
                 )) #limits generation time
             if not response or not response.text:
                 return None

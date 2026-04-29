@@ -1,7 +1,8 @@
 import os
 import re
-from typing import Any
 import time
+import asyncio
+from typing import Any
 
 from faster_whisper import WhisperModel
 from groq_service import analyze_behavior_data
@@ -15,6 +16,11 @@ else:
     print("Warning: HF_TOKEN not found in environment variables.")
     
 class WhisperService:
+    FILLER_PATTERN = re.compile(r'\b(um|uh|like|you know|actually|basically)\b')
+    TOKEN_PATTERN = re.compile(r"[a-zA-Z']+")
+    POSITIVE_MARKERS = frozenset({"confident", "excited", "great", "strong", "enjoy"})
+    NEGATIVE_MARKERS = frozenset({"nervous", "worried", "stressed", "hard", "difficult"})
+
     def __init__(self) -> None:
         self.model_size = os.getenv("WHISPER_MODEL_SIZE", "tiny")
         self.device = os.getenv("WHISPER_DEVICE", "cpu")
@@ -38,7 +44,9 @@ class WhisperService:
         model = self._get_model()
         
         whisper_start_time = time.time()
-        segments, _ = model.transcribe(file_path, beam_size=2, vad_filter=True)
+        segments, _ = await asyncio.to_thread(
+            model.transcribe, file_path, beam_size=1, vad_filter=True
+        )
         segment_list = list(segments)
         whisper_end_time = time.time()
         print(f"FasterWhisper Transcription Time: {whisper_end_time - whisper_start_time:.2f} seconds")
@@ -46,11 +54,9 @@ class WhisperService:
         transcript = " ".join(seg.text.strip() for seg in segment_list).strip()
         lower_text = transcript.lower()
 
-        filler_words = ["um", "uh", "like", "you know", "actually", "basically"]
-        filler_count = sum(lower_text.count(word) for word in filler_words)
-
-        tokens = re.findall(r"[a-zA-Z']+", lower_text)
-        stutters = sum(1 for i in range(1, len(tokens)) if tokens[i] == tokens[i - 1])
+        filler_count = len(self.FILLER_PATTERN.findall(lower_text))
+        tokens = self.TOKEN_PATTERN.findall(lower_text)
+        stutters = sum(1 for current_word, next_word in zip(tokens, tokens[1:]) if current_word == next_word)
 
         pauses: list[str] = []
         for i in range(1, len(segment_list)):
@@ -58,15 +64,14 @@ class WhisperService:
             if gap >= 0.7:
                 pauses.append(f"{segment_list[i].start:.2f}s")
 
-        sentiment = "Neutral"
-        positive_markers = {"confident", "excited", "great", "strong", "enjoy"}
-        negative_markers = {"nervous", "worried", "stressed", "hard", "difficult"}
-        positive_hits = sum(1 for token in tokens if token in positive_markers)
-        negative_hits = sum(1 for token in tokens if token in negative_markers)
+        positive_hits = sum(1 for token in tokens if token in self.POSITIVE_MARKERS)
+        negative_hits = sum(1 for token in tokens if token in self.NEGATIVE_MARKERS)
         if positive_hits > negative_hits:
             sentiment = "Positive"
         elif negative_hits > positive_hits:
             sentiment = "Negative"
+        else:
+            sentiment = "Neutral"
         
         behavior_summary = (          
             f"Transcript: '{transcript}'\n"
