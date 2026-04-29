@@ -76,6 +76,7 @@ class Vision:
         analysis_results = []
         frame_idx = 0
         distraction_count = 0
+        SKIP_FRAMES = 5
         focus_state = "Focused"
 
         #track how long a user has been continuously distracted
@@ -91,21 +92,23 @@ class Vision:
             #get the exact time of the current frame in seconds
             video_time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
 
-            #mediaPipe doesn't need high-res for landmarks, and smaller images process much faster.
-            height, width = frame.shape[:2]
-            if width > 640:
-                scale = 640 / width
-                frame = cv2.resize(frame, (640, int(height * scale)))
+            #skipping frames
+            if frame_idx % SKIP_FRAMES == 0:
+                #mediaPipe doesn't need high-res for landmarks, and smaller images process much faster.
+                height, width = frame.shape[:2]
+                if width > 640:
+                    scale = 640 / width
+                    frame = cv2.resize(frame, (640, int(height * scale)))
 
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.face_mesh.process(image_rgb)
-            
-            current_focus_state = "Face not visible" 
-            if results.multi_face_landmarks:
-                face_landmarks = results.multi_face_landmarks[0].landmark
-                current_focus_state = self.check_focus(face_landmarks)
-            
-            focus_state = current_focus_state
+                image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                results = self.face_mesh.process(image_rgb)
+                
+                current_focus_state = "Face not visible" 
+                if results.multi_face_landmarks:
+                    face_landmarks = results.multi_face_landmarks[0].landmark
+                    current_focus_state = self.check_focus(face_landmarks)
+                
+                focus_state = current_focus_state
 
             if focus_state != "Focused":
                 if not currently_distracted:

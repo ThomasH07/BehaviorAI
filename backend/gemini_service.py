@@ -21,7 +21,7 @@ class GeminiService:
         genai.configure(api_key=self.api_key)
         
         #switched to the standard stable identifier to fix the 404 error
-        self.model_name = "gemini-2.0-flash-lite"
+        self.model_name = "gemini-2.5-flash-lite"
         try:
             self.model = genai.GenerativeModel(self.model_name)
             print(f"Gemini Service Initialized with {self.model_name}")
