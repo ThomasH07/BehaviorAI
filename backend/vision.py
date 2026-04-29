@@ -1,7 +1,5 @@
 import cv2
 import mediapipe as mp
-import os
-import shutil
 
 class Vision:
     def __init__(self):        
@@ -26,18 +24,18 @@ class Vision:
     def check_focus(self, landmarks) -> str:
         try:
             #head turn
-            nose_x = landmarks[1]["x"]
-            left_cheek_x = landmarks[234]["x"]
-            right_cheek_x = landmarks[454]["x"]
-            #calculate the total width of the face in pixels
+            nose_x = landmarks[1].x
+            left_cheek_x = landmarks[234].x
+            right_cheek_x = landmarks[454].x
+            
             face_width = right_cheek_x - left_cheek_x
             raw_yaw = (nose_x - left_cheek_x) / face_width if face_width != 0 else 0.5
 
-            #eye movement left_eye_boundary_landmarks
-            left_iris_x = landmarks[468]["x"]
-            inner_eye_x = landmarks[133]["x"]
-            outer_eye_x = landmarks[33]["x"]
-            #calculate the total width of the eye opening
+            #eye movement
+            left_iris_x = landmarks[468].x
+            inner_eye_x = landmarks[133].x
+            outer_eye_x = landmarks[33].x
+            
             eye_width = inner_eye_x - outer_eye_x
             raw_iris = (left_iris_x - outer_eye_x) / eye_width if eye_width != 0 else 0.5
 
@@ -67,7 +65,7 @@ class Vision:
             elif raw_iris > (self.baseline["iris"] + 0.12):
                 return "Eyes darted right"
             
-        except (IndexError, KeyError):
+        except IndexError:
             return "Face not fully visible"
         return "Focused"
 
@@ -78,7 +76,6 @@ class Vision:
         analysis_results = []
         frame_idx = 0
         distraction_count = 0
-        SKIP_FRAMES = 5  
         focus_state = "Focused"
 
         #track how long a user has been continuously distracted
@@ -94,25 +91,22 @@ class Vision:
             #get the exact time of the current frame in seconds
             video_time_sec = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
 
-            #skipping frames
-            if frame_idx % SKIP_FRAMES == 0:
-                
-                image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                results = self.face_mesh.process(image_rgb)
-                
-                current_focus_state = "Face not visible" 
-                if results.multi_face_landmarks:
-                    face_landmarks = results.multi_face_landmarks[0]
-                    h, w, _ = frame.shape
-                    landmarks_data = []
-                    for lm in face_landmarks.landmark:
-                        landmarks_data.append({"x": int(lm.x * w), "y": int(lm.y * h)})
-                
-                    current_focus_state = self.check_focus(landmarks_data)
-                
-                #update our "cached" state
-                focus_state = current_focus_state
-            #distraction logic
+            #mediaPipe doesn't need high-res for landmarks, and smaller images process much faster.
+            height, width = frame.shape[:2]
+            if width > 640:
+                scale = 640 / width
+                frame = cv2.resize(frame, (640, int(height * scale)))
+
+            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = self.face_mesh.process(image_rgb)
+            
+            current_focus_state = "Face not visible" 
+            if results.multi_face_landmarks:
+                face_landmarks = results.multi_face_landmarks[0].landmark
+                current_focus_state = self.check_focus(face_landmarks)
+            
+            focus_state = current_focus_state
+
             if focus_state != "Focused":
                 if not currently_distracted:
                     #they just looked away start timer
@@ -130,11 +124,7 @@ class Vision:
                         # MM:SS
                         mm = int(video_time_sec // 60)
                         ss = int(video_time_sec % 60)
-                        timestamp_str = f"{mm:02d}:{ss:02d}"
-                        #log to database
-                        self.log_distraction_to_db(timestamp_str, focus_state, frame_idx)
-                        
-                        #mark as logged so we don't log again if they keep looking away for 10+ seconds
+                        self.log_distraction_to_db(f"{mm:02d}:{ss:02d}", focus_state, frame_idx)
                         logged_this_distraction = True 
             else:
                 #they looked back at the screen
