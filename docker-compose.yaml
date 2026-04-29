@@ -27,8 +27,7 @@ services:
       - ./backend:/app
     env_file:
       - ./backend/.env
-    environment:
-      - HF_TOKEN=${HF_TOKEN}
+      
 
 #v1
 # sudo docker-compose up --build -d backend 
