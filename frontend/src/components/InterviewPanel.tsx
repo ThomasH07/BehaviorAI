@@ -53,11 +53,11 @@ export default function InterviewPanel({
   onReset,
   onEnd,
 }: InterviewPanelProps) {
-  const [timeLeft, setTimeLeft] = useState<number>(60); // 1 minutes
+  const [timeLeft, setTimeLeft] = useState<number>(120); // 2 minutes
   useEffect(() => {
     //if we aren't recording, keep the timer reset and ready
     if (status !== "recording") {
-      setTimeLeft(60);
+      setTimeLeft(120);
       return;
     }
 

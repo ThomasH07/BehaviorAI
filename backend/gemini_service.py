@@ -21,7 +21,7 @@ class GeminiService:
         genai.configure(api_key=self.api_key)
         
         #switched to the standard stable identifier to fix the 404 error
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = "gemini-2.0-flash-lite"
         try:
             self.model = genai.GenerativeModel(self.model_name)
             print(f"Gemini Service Initialized with {self.model_name}")
@@ -79,7 +79,11 @@ class GeminiService:
                 "Output ONLY the question text. No quotes, no labels, no headers. "
                 f"STRICT RULE: The question must be fundamentally different from: {self.arrofquestions}"
             )
-            response = self.model.generate_content(prompt)
+            response = self.model.generate_content(prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=60,  #limits generation time
+                    temperature=0.7
+                ))
             if not response or not response.text:
                 return None
 
