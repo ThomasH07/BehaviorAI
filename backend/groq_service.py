@@ -1,4 +1,5 @@
 import os
+import time
 from groq import AsyncGroq
 from dotenv import load_dotenv
 from gemini_service import GeminiService
@@ -14,6 +15,7 @@ except Exception as e:
 
 async def analyze_behavior_data(behavior_context: str, model_name: str = "llama-3.1-8b-instant") -> str:
     try:
+        start_time = time.time()
         chat_completion = await client.chat.completions.create(
             messages=[
                 {   
@@ -54,6 +56,8 @@ async def analyze_behavior_data(behavior_context: str, model_name: str = "llama-
             max_tokens=1024,
         )
         print(f"chat completed{chat_completion}")
+        end_time = time.time()
+        print(f"Groq API generation time: {end_time - start_time:.2f} seconds")
         return chat_completion.choices[0].message.content
 
     except Exception as e:

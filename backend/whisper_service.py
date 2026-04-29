@@ -1,6 +1,7 @@
 import os
 import re
 from typing import Any
+import time
 
 from faster_whisper import WhisperModel
 from groq_service import analyze_behavior_data
@@ -35,8 +36,12 @@ class WhisperService:
 
     async def transcribe_and_analyze(self, file_path: str) -> dict[str, Any]:
         model = self._get_model()
+        
+        whisper_start_time = time.time()
         segments, _ = model.transcribe(file_path, beam_size=2, vad_filter=True)
         segment_list = list(segments)
+        whisper_end_time = time.time()
+        print(f"FasterWhisper Transcription Time: {whisper_end_time - whisper_start_time:.2f} seconds")
 
         transcript = " ".join(seg.text.strip() for seg in segment_list).strip()
         lower_text = transcript.lower()
@@ -71,7 +76,10 @@ class WhisperService:
             f"Tone/Sentiment: {sentiment}"
         )
         
+        groq_start_time = time.time()
         feedback = await analyze_behavior_data(behavior_context=behavior_summary)
+        groq_end_time = time.time()
+        print(f"Groq Analysis Time: {groq_end_time - groq_start_time:.2f} seconds")
         return {
             "transcript": transcript,
             "stutters": stutters,
