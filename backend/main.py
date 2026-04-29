@@ -3,6 +3,7 @@ import os
 import secrets
 import hashlib
 import random
+import time 
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -105,7 +106,10 @@ def analyze_video(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
     #call the Vision Service
     try:
+        start_time = time.time() #Timer
         data, distractions = vision_service.analyze_video_file(temp_filename)
+        vision_time = time.time() - start_time #Timer End
+        print(f"MediaPipe (Vision) processing time: {vision_time:.2f} seconds") #Log Time
     finally:
         #clean up
         if os.path.exists(temp_filename):
@@ -136,7 +140,10 @@ async def process_behavior(file: UploadFile = File(...)):
         #wait for FFmpeg to finish without blocking the event loop
         await process.communicate()
 
+        start_time = time.time() #(Whisper + Groq)
         final_data = await whisper_service.transcribe_and_analyze(temp_wav)
+        audio_text_time = time.time() - start_time #Timer End
+        print(f"FasterWhisper & Groq processing time: {audio_text_time:.2f} seconds") #Log Time
         
         return {"status": "success", "data": final_data, "source": "local_whisper"}
     except Exception as e:
