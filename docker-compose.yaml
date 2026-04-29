@@ -28,6 +28,7 @@ services:
     env_file:
       - ./backend/.env
       
+      
 
 #v1
 # sudo docker-compose up --build -d backend 
