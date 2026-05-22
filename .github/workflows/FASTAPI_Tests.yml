@@ -1,0 +1,5 @@
+name: FastAPI_Tests.yml
+
+  on:
+    push:
+      branches: [main]
