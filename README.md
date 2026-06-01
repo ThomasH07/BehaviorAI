@@ -1,5 +1,6 @@
 # BehaviorAI: Your Virtual Interview Coach
-[tests]
+[![FastAPI Tests](https://github.com/ThomasH07/BehaviorAI/actions/workflows/FASTAPI_Tests.yml/badge.svg)](https://github.com/ThomasH07/BehaviorAI/actions/workflows/FASTAPI_Tests.yml)
+
 
 **BehaviorAI** is an AI-powered web platform designed to help job seekers practice, analyze, and perfect their performance in asynchronous, one-way video interviews (such as HireVue). 
 

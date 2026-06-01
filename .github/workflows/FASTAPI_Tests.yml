@@ -1,5 +1,12 @@
 name: FastAPI Tests
-
+env:
+  user: "test_user"
+  password: "test_password"
+  host: "localhost"
+  port: "5432"
+  dbname: "test_db"
+  GEMINI_API_KEY: "abc123"
+  
 on:
   push:
     branches: [ "main" ]
