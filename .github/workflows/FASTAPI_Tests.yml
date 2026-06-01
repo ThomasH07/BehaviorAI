@@ -1,12 +1,5 @@
 name: FastAPI Tests
-env:
-  user: "test_user"
-  password: "test_password"
-  host: "localhost"
-  port: "5432"
-  dbname: "test_db"
-  GEMINI_API_KEY: "abc123"
-  
+
 on:
   push:
     branches: [ "main" ]
@@ -17,6 +10,20 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -34,6 +41,12 @@ jobs:
         pip install -r requirements.txt
 
     - name: Run pytest
+      env:
+        user: "test_user"
+        password: "test_password"
+        host: "localhost"
+        port: "5432"
+        dbname: "test_db"
       run: |
         cd backend
         pytest -v
