@@ -1,89 +1,30 @@
-# BehaviorAI
+# BehaviorAI: Your Virtual Interview Coach
+[tests]
 
-Make sure to 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+**BehaviorAI** is an AI-powered web platform designed to help job seekers practice, analyze, and perfect their performance in asynchronous, one-way video interviews (such as HireVue). 
 
-## Setup
+By simulating the high-pressure environment of timed virtual interviews, BehaviorAI records candidate responses and provides immediate, actionable feedback on both the content of their answers and their delivery mechanics.
 
-aws cli set up: 
+## Key Features
 
-windows
+* **Authentic Interview Simulation:** Practice with timed countdowns, auto-recording, and no-redo constraints to mimic the exact feel of a real HireVue interview.
+* **STAR Method Analysis:** The application transcribes your response and highlights where you successfully hit the Situation, Task, Action, and Result components of a strong behavioral answer.
+* **Delivery & Presence Metrics:** Get instant feedback on your pacing, filler word usage ("um," "like"), tone, and eye contact consistency.
 
-https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+## Tech Stack
+[![Deploy with Vercel](https://img.shields.io/badge/Deployed_on-Vercel-black.svg)](https://vercel.com/)
+[![Database: Supabase](https://img.shields.io/badge/Database-Supabase-3ECF8E.svg)](https://supabase.com/)
+[![Infrastructure: Oracle Cloud](https://img.shields.io/badge/Compute-Oracle_VM-F80000.svg)](https://www.oracle.com/cloud/)
 
-mac
+| Domain | Technologies Used |
+|---|---|
+| **Frontend** | React, Next.js |
+| **Backend** | Node.js, Express, Python, FastAPI |
+| **Database** | PostgreSQL |
+| **AI / Machine Learning** | OpenAI Whisper (Transcription), Groq (Content Analysis), Gemini (Question Generation), OpenCV (Eye tracking) |
 
-`brew install awscli`
-
-this is the aws cli that allows you to run aws cmds
-
-`aws configure set region us-east-2`
-
-`aws login`
-
-on project directory folder
-
-`npm install` 
-
-Make sure to create a venv in the backend folder:
-
-macOS/Linux
-
-`python3.12 -m venv venv`
-
-Windows
-
-`py -3.12 -m venv venv`
-
-and 
-
-`pip install -r requirements.txt`
-
-## Available Scripts
-
-In the project directory, you can run:
-
-### `npm run dev`
-This is suppose to set up the backend and the frontend all together and runs both frontend and backend
-
-later on will add another script that runs both backend and frontend tests
-
-In the backend directory, you can run:
-
-### `uvicorn main:app --reload`
-Runs the fastAPI server
-
-In the frontend directory, you can run:
-
-### `npm start`
-
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
-
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
-
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## Prerequisites
+[![Node.js Version](https://img.shields.io/badge/Node.js-20-green.svg)](https://nodejs.org/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12.6-blue.svg)](https://www.python.org/downloads/)
+* A Supabase project (Database, Auth, and Storage enabled)
+* A valid API Key for OpenAI and groq
