@@ -1,4 +1,4 @@
-#mainly for local use
+#mainly for vm
 version: '3.3'
 services:
   # #frontend

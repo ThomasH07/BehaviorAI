@@ -13,9 +13,9 @@ PASSWORD = os.getenv("password")
 HOST = os.getenv("host")
 PORT = os.getenv("port")
 DBNAME = os.getenv("dbname")
-
+ssl_mode = os.getenv("SSL_MODE", "require")
 # Construct the Database URL
-DATABASE_URL = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}?sslmode=require"
+DATABASE_URL = f"postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{DBNAME}?sslmode={ssl_mode}"
 
 # Create the SQLAlchemy engine, connection to Supabase PostgreSQL database
 engine = create_engine(DATABASE_URL)
