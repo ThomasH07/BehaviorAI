@@ -23,8 +23,11 @@ services:
       dockerfile: Dockerfile.dev
     #survives vm reboots, otherwise port 8000 silently drops
     restart: unless-stopped
+    #loopback only: caddy terminates tls and proxies to this, so the port must
+    #not be reachable from the internet. docker's nat bypasses iptables INPUT,
+    #so binding to 127.0.0.1 is what actually keeps it private.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
     env_file:
