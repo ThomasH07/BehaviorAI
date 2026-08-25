@@ -45,6 +45,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "behaviorai_session")
 SESSION_DURATION_DAYS = int(os.getenv("SESSION_DURATION_DAYS", "7"))
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "lax").lower()
 MIN_PASSWORD_LENGTH = int(os.getenv("MIN_PASSWORD_LENGTH", "12"))
 MAX_BCRYPT_BYTES = 72
 
@@ -95,12 +96,17 @@ def set_session_cookie(response: Response, session_id: str, max_age_seconds: int
         value=session_id,
         httponly=True,
         max_age=max_age_seconds,
-        samesite="lax",
+        samesite=SESSION_COOKIE_SAMESITE,
         secure=SESSION_COOKIE_SECURE,
     )
 
 def clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(key=SESSION_COOKIE_NAME)
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        httponly=True,
+        samesite=SESSION_COOKIE_SAMESITE,
+        secure=SESSION_COOKIE_SECURE,
+    )
 @app.get("/")
 async def root():
     return {"status": "Backend is running", "api_docs": "/docs"}
