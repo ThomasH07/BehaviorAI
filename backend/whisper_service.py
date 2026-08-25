@@ -44,10 +44,15 @@ class WhisperService:
         model = self._get_model()
         
         whisper_start_time = time.time()
-        segments, _ = await asyncio.to_thread(
-            model.transcribe, file_path, beam_size=1, vad_filter=True
-        )
-        segment_list = list(segments)
+
+        def _transcribe() -> list:
+            #faster-whisper hands back a lazy generator: decoding happens while
+            #iterating, so list() has to run inside the thread as well, otherwise
+            #the event loop is blocked for the whole transcription
+            segments, _ = model.transcribe(file_path, beam_size=1, vad_filter=True)
+            return list(segments)
+
+        segment_list = await asyncio.to_thread(_transcribe)
         whisper_end_time = time.time()
         print(f"FasterWhisper Transcription Time: {whisper_end_time - whisper_start_time:.2f} seconds")
 

@@ -3,7 +3,8 @@ import os
 import secrets
 import hashlib
 import random
-import time 
+import tempfile
+import time
 from datetime import datetime, timedelta
 from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -12,14 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engine, SessionLocal
 import models
 import schemas
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 #mediapipe
-import shutil
 import json
 import asyncio
 models.Base.metadata.create_all(bind=engine) # creates the tables in AWS RDS if they don't exist yet
-from vision import vision_service
+from vision import analyze_video_file
 from gemini_service import gemini_service
 from whisper_service import whisper_service
 import imageio_ffmpeg
@@ -46,6 +47,12 @@ SESSION_DURATION_DAYS = int(os.getenv("SESSION_DURATION_DAYS", "7"))
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
 MIN_PASSWORD_LENGTH = int(os.getenv("MIN_PASSWORD_LENGTH", "12"))
 MAX_BCRYPT_BYTES = 72
+
+#whisper and mediapipe are cpu-bound; on a small vm allow only a few at a time so
+#concurrent uploads queue up instead of exhausting memory
+ML_CONCURRENCY = int(os.getenv("ML_CONCURRENCY", "1"))
+ml_semaphore = asyncio.Semaphore(ML_CONCURRENCY)
+UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 FALLBACK_QUESTIONS = [
     "Tell me about a time you had to resolve a conflict within a team.",
@@ -98,18 +105,33 @@ def clear_session_cookie(response: Response) -> None:
 async def root():
     return {"status": "Backend is running", "api_docs": "/docs"}
 
-@app.post("/analyze-video")
-def analyze_video(file: UploadFile = File(...)):
-    #handle File IO
-    temp_filename = f"temp_{file.filename}"
-    with open(temp_filename, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    #call the Vision Service
+async def save_upload_to_temp(file: UploadFile, suffix: str) -> str:
+    """Stream an upload to a unique temp file and return its path.
+
+    Streaming keeps a long recording from being held in memory all at once, and
+    the generated name avoids both path traversal via file.filename and
+    collisions between two users uploading the same filename concurrently.
+    """
+    fd, path = tempfile.mkstemp(prefix="behaviorai_", suffix=suffix)
     try:
-        start_time = time.time() #Timer
-        data, distractions = vision_service.analyze_video_file(temp_filename)
-        vision_time = time.time() - start_time #Timer End
-        print(f"MediaPipe (Vision) processing time: {vision_time:.2f} seconds") #Log Time
+        with os.fdopen(fd, "wb") as buffer:
+            while chunk := await file.read(UPLOAD_CHUNK_SIZE):
+                buffer.write(chunk)
+    except Exception:
+        os.unlink(path)
+        raise
+    return path
+
+@app.post("/analyze-video")
+async def analyze_video(file: UploadFile = File(...)):
+    temp_filename = await save_upload_to_temp(file, ".webm")
+    try:
+        async with ml_semaphore:
+            start_time = time.time() #Timer
+            #runs in a worker thread so mediapipe doesn't block the event loop
+            data, distractions = await asyncio.to_thread(analyze_video_file, temp_filename)
+            vision_time = time.time() - start_time #Timer End
+            print(f"MediaPipe (Vision) processing time: {vision_time:.2f} seconds") #Log Time
     finally:
         #clean up
         if os.path.exists(temp_filename):
@@ -120,31 +142,34 @@ def analyze_video(file: UploadFile = File(...)):
 @app.post("/transcribe")
 async def process_behavior(file: UploadFile = File(...)):
     #paths for temporary processing
-    temp_webm = f"temp_{file.filename}"
-    temp_wav = temp_webm.replace(".webm", ".wav")
-    
+    temp_webm = await save_upload_to_temp(file, ".webm")
+    temp_wav = f"{os.path.splitext(temp_webm)[0]}.wav"
+
     try:
-        #save incoming recording
-        with open(temp_webm, "wb") as buffer:
-            buffer.write(await file.read())
-            
         ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-        
+
         #use asyncio's subprocess so FFmpeg doesn't freeze the server
         process = await asyncio.create_subprocess_exec(
-            ffmpeg_path, "-y", "-i", temp_webm, 
+            ffmpeg_path, "-y", "-i", temp_webm,
             "-vn", "-ar", "16000", "-ac", "1", temp_wav,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         #wait for FFmpeg to finish without blocking the event loop
-        await process.communicate()
+        _, stderr = await process.communicate()
+        #without this check a failed conversion surfaces later as a confusing
+        #"file not found" from whisper instead of the actual ffmpeg error
+        if process.returncode != 0:
+            raise RuntimeError(
+                f"ffmpeg exited with {process.returncode}: {stderr.decode(errors='replace')[-500:]}"
+            )
 
-        start_time = time.time() #(Whisper + Groq)
-        final_data = await whisper_service.transcribe_and_analyze(temp_wav)
-        audio_text_time = time.time() - start_time #Timer End
-        print(f"FasterWhisper & Groq processing time: {audio_text_time:.2f} seconds") #Log Time
-        
+        async with ml_semaphore:
+            start_time = time.time() #(Whisper + Groq)
+            final_data = await whisper_service.transcribe_and_analyze(temp_wav)
+            audio_text_time = time.time() - start_time #Timer End
+            print(f"FasterWhisper & Groq processing time: {audio_text_time:.2f} seconds") #Log Time
+
         return {"status": "success", "data": final_data, "source": "local_whisper"}
     except Exception as e:
         print(f"Server Error: {e}")
@@ -359,6 +384,25 @@ def get_session_detail(user_id: int, session_id: int, db: Session = Depends(get_
         gaze_count=(latest_response.gaze_count if latest_response else None),
         stutter_count=(latest_response.stutter_count if latest_response else None),
     )
+
+
+#must stay above the /{full_path:path} catch-all below, otherwise the react
+#fallback answers /health with a 200 and monitoring never sees an outage
+@app.get("/health")
+def health(db: Session = Depends(get_db)):
+    """Liveness probe for the compose healthcheck and external uptime monitors.
+
+    Touches the database so a Supabase outage reports unhealthy too, rather than
+    only catching a dead process.
+    """
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": str(exc)},
+        )
+    return {"status": "ok", "database": "ok"}
 
 
 static_dir = os.path.join(os.getcwd(), "static")

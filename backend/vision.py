@@ -147,5 +147,21 @@ class Vision:
         cap.release()
         return analysis_results, distraction_count
 
-#initialize the service for use in main.py
-vision_service = Vision()
+    def close(self):
+        #release the mediapipe graph instead of waiting on the garbage collector
+        self.face_mesh.close()
+
+
+def analyze_video_file(temp_filename: str):
+    """Analyze one recording using a Vision instance dedicated to that request.
+
+    Vision carries per-video calibration state (baseline, calibrating), so a
+    shared instance would stop recalibrating after the first video and score
+    every later user against the first user's head position. FaceMesh is also
+    not thread-safe, so concurrent requests must not share one.
+    """
+    vision = Vision()
+    try:
+        return vision.analyze_video_file(temp_filename)
+    finally:
+        vision.close()

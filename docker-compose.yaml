@@ -21,12 +21,21 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.dev
+    #survives vm reboots, otherwise port 8000 silently drops
+    restart: unless-stopped
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
     env_file:
       - ./backend/.env
+    #slim image has no curl, so probe with the stdlib
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
 
 #v1
 # docker-compose up --build -d backend 
