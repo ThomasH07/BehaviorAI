@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from gemini_service import GeminiService
 load_dotenv()
 
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 try:
     client = AsyncGroq(
         api_key=os.environ.get("GROQ_API_KEY"),
@@ -13,7 +14,7 @@ try:
 except Exception as e:
     print(f"Failed to initialize Groq Client. Is your API key set? Error: {e}")
 
-async def analyze_behavior_data(behavior_context: str, model_name: str = "llama-3.1-8b-instant") -> str:
+async def analyze_behavior_data(behavior_context: str, model_name: str = GROQ_MODEL) -> str:
     try:
         start_time = time.time()
         chat_completion = await client.chat.completions.create(
